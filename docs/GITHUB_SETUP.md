@@ -56,9 +56,9 @@ git push -u origin main
 
 **`/Users/bytedance/projects/fl-agent`**
 
-- **`main`** / **`dev`**：本地已对齐；待首次 `push` 后远端可见。
+- **`main`** / **`dev`**：已与 GitHub 同步；日常用 [`docs/SYNC.md`](docs/SYNC.md) 的 `scripts/publish.sh`（先 pull 再 push 当前分支）。
 
 ## 说明
 
 - 未修改全局 `git config`；历史提交作者为 `Eternity1212 <Eternity1212@users.noreply.github.com>`。  
-- **“全自动实时同步”**：GitHub 不会主动拉取你未提交的本地改动；需要 **保存 + commit + push**，或由你在 CI 里配置 token 后由 runner 推送。
+- **“全自动实时同步”**：仍需 **commit + push**；可用 `scripts/publish.sh` 减少遗漏。
