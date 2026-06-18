@@ -1,48 +1,64 @@
-# GitHub 推送与登录（一次性配置）
+# GitHub 推送与登录（本机已预装工具）
 
-当前环境 **未配置** GitHub 凭据，因此自动化 `git push` 会失败。任选其一完成认证后，在仓库根目录执行推送命令即可。
+本机已完成：
 
-## 方案 A：HTTPS + Personal Access Token（PAT，适合快速开始）
+- **`gh` CLI**：`~/bin/gh`（已写入 `~/.bash_profile` 与 `~/.zprofile` 的 `PATH`，新开终端生效；当前 shell 可 `export PATH="$HOME/bin:$PATH"`）。  
+- **专用 SSH 密钥**：`~/.ssh/id_ed25519_flagent`（**私钥勿上传、勿提交**）。  
+- **`~/.ssh/config`**：已为 `Host github.com` 配置 `IdentityFile ~/.ssh/id_ed25519_flagent` 与 `IdentitiesOnly yes`，并放在通配 `Host *` 之前，避免走错凭据。  
+- **仓库远程**：`origin` 已设为 `git@github.com:Eternity1212/fl-agent.git`。
 
-1. 在 GitHub 创建 **Fine-grained PAT** 或 **classic PAT**（`repo` 权限）。  
-2. macOS 可在首次 `git push` 时用钥匙串保存用户名/Token；或：  
-   ```bash
-   cd /Users/bytedance/projects/fl-agent
-   git push -u origin main
-   git push -u origin dev
-   ```  
-   用户名填 GitHub 用户名，密码填 **Token**（不是账户密码）。
+## 你必须完成的一步（一次性）：把公钥加到 GitHub 账户
 
-## 方案 B：SSH（适合长期使用）
+在浏览器打开：**[SSH and GPG keys](https://github.com/settings/keys)** → **New SSH key** → 粘贴下面整行（Title 随意，例如 `fl-agent-mac`）：
 
-1. 生成密钥（若还没有）：`ssh-keygen -t ed25519 -C "your_email@example.com"`  
-2. 将 `~/.ssh/id_ed25519.pub` 添加到 GitHub → Settings → SSH keys。  
-3. 切换远程并推送：  
-   ```bash
-   cd /Users/bytedance/projects/fl-agent
-   git remote set-url origin git@github.com:Eternity1212/fl-agent.git
-   git push -u origin main
-   git push -u origin dev
-   ```
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFcsH3FJ8cYnoFWU5WV7/8QW0qy4HJE1M2hiUOGhYRBJ fl-agent-github
+```
 
-## 方案 C：GitHub CLI（`gh`）
+保存后，在本机验证：
 
 ```bash
-brew install gh
-gh auth login
+export PATH="$HOME/bin:$PATH"
+ssh -T git@github.com
+```
+
+看到 `Hi Eternity1212!` 类似提示即成功。
+
+## 推送 `main` 与 `dev`（公钥生效后执行）
+
+```bash
 cd /Users/bytedance/projects/fl-agent
 git push -u origin main
 git push -u origin dev
 ```
 
+## 可选：用 `gh` 把公钥写进 GitHub（需先浏览器登录一次）
+
+```bash
+export PATH="$HOME/bin:$PATH"
+gh auth login -h github.com -p ssh -w
+gh ssh-key add ~/.ssh/id_ed25519_flagent.pub -t "fl-agent"
+```
+
+## 备选：HTTPS + PAT
+
+若更想用 HTTPS：
+
+```bash
+cd /Users/bytedance/projects/fl-agent
+git remote set-url origin https://github.com/Eternity1212/fl-agent.git
+git push -u origin main
+```
+
+用户名：`Eternity1212`，密码处粘贴 **PAT**。
+
 ## 本机仓库路径
 
-克隆与工作目录：**`/Users/bytedance/projects/fl-agent`**
+**`/Users/bytedance/projects/fl-agent`**
 
-- 默认分支：**`main`**（已含首次提交 `e0e5dc8`）  
-- 集成分支：**`dev`**（与 `main` 当前同提交，便于后续从 `feat/*` 合并）
+- **`main`** / **`dev`**：本地已对齐；待首次 `push` 后远端可见。
 
 ## 说明
 
-- 未替你执行 **`git config`** 全局修改；提交作者使用了 `--author="Eternity1212 <Eternity1212@users.noreply.github.com>"`（可按需改为你的 GitHub 绑定邮箱）。  
-- **实时自动同步**：需在你本机保存凭据后，由你或 CI 在 `git push` 时上传；本环境无法代替你完成浏览器 OAuth。
+- 未修改全局 `git config`；历史提交作者为 `Eternity1212 <Eternity1212@users.noreply.github.com>`。  
+- **“全自动实时同步”**：GitHub 不会主动拉取你未提交的本地改动；需要 **保存 + commit + push**，或由你在 CI 里配置 token 后由 runner 推送。
