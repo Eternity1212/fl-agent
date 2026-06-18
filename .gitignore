@@ -16,7 +16,7 @@ checkpoints/
 *.pth
 *.ckpt
 data/raw/
-data/processed/
+configs/splits/generated/
 *.zip
 .env
 *.egg-info/

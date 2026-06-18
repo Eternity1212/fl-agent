@@ -9,7 +9,7 @@ This repo follows the technical plan: **P2 (RETFound + PEFT) headline**, **P1 (n
 - `dev` — integration branch; merge via PR from `feat/*`.
 - `feat/*` — short-lived feature branches.
 
-See [docs/BRANCHING.md](docs/BRANCHING.md), [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md), and **[docs/SYNC.md](docs/SYNC.md)** (daily pull/push).
+See [docs/BRANCHING.md](docs/BRANCHING.md), [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md), **[docs/SYNC.md](docs/SYNC.md)**, and **[docs/ROADMAP.md](docs/ROADMAP.md)**.
 
 After SSH key setup, routine publish for the **current branch**:
 
@@ -40,8 +40,14 @@ python3 -m pip install -U pip setuptools wheel
 python3 -m pip install -e ".[dev]"
 python3 -m ruff check src tests
 python3 -m pytest -q
-# Step 1: RFMiDLocalDataset + tests (docs/DATA_CARD.md)
-# Next: split JSON builders + torch bridge + RETFound/LoRA
+./scripts/smoke.sh
+
+# Build split JSON (after you have labels CSV locally)
+python3 -m fed_agent.tools.build_splits --labels_csv path/to/RFMiD_Training_Labels.csv
+
+# Optional torch bridge tests / training (install torch)
+# python3 -m pip install -e ".[torch]"
+# python3 -m pytest -q tests/test_rfmid_torch.py
 ```
 
 ## License

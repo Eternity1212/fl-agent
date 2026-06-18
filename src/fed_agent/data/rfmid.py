@@ -12,6 +12,52 @@ def _norm_col(name: str) -> str:
     return name.strip().lower().replace(" ", "")
 
 
+def load_rfmid_label_table(labels_csv: Path) -> tuple[tuple[str, ...], tuple[str, ...], np.ndarray]:
+    """Parse an RFMiD-style CSV into (image_ids, label_names, Y) with Y float32 {0,1}."""
+
+    labels_csv = Path(labels_csv)
+    if not labels_csv.is_file():
+        raise FileNotFoundError(f"Missing labels CSV: {labels_csv}")
+
+    image_ids: list[str] = []
+    label_matrix: list[list[float]] = []
+    label_names: list[str]
+
+    with labels_csv.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None:
+            raise ValueError("CSV has no header row")
+
+        fields = list(reader.fieldnames)
+        norm_map = {_norm_col(h): h for h in fields}
+        if "imageid" not in norm_map:
+            raise ValueError("CSV must include an ImageID column")
+        id_key = norm_map["imageid"]
+
+        label_keys = [h for h in fields if h != id_key]
+        label_names = label_keys
+
+        for row in reader:
+            iid = str(row[id_key]).strip()
+            if not iid:
+                continue
+            vec: list[float] = []
+            for key in label_keys:
+                raw = row.get(key, "")
+                if raw is None or str(raw).strip() == "":
+                    vec.append(0.0)
+                else:
+                    vec.append(float(int(float(str(raw).strip()))))
+            image_ids.append(iid)
+            label_matrix.append(vec)
+
+    if not image_ids:
+        raise ValueError("No rows parsed from labels CSV")
+
+    y = np.asarray(label_matrix, dtype=np.float32)
+    return tuple(image_ids), tuple(label_names), y
+
+
 class RFMiDLocalDataset:
     """Load RFMiD-style multi-label tables from a local folder (no network I/O).
 
@@ -28,49 +74,10 @@ class RFMiDLocalDataset:
     def __init__(self, labels_csv: Path, images_dir: Path) -> None:
         self.labels_csv = Path(labels_csv)
         self.images_dir = Path(images_dir)
-        if not self.labels_csv.is_file():
-            raise FileNotFoundError(f"Missing labels CSV: {self.labels_csv}")
         if not self.images_dir.is_dir():
             raise FileNotFoundError(f"Missing images dir: {self.images_dir}")
 
-        image_ids: list[str] = []
-        label_matrix: list[list[float]] = []
-        label_names: list[str]
-
-        with self.labels_csv.open(newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            if reader.fieldnames is None:
-                raise ValueError("CSV has no header row")
-
-            fields = list(reader.fieldnames)
-            norm_map = {_norm_col(h): h for h in fields}
-            if "imageid" not in norm_map:
-                raise ValueError("CSV must include an ImageID column")
-            id_key = norm_map["imageid"]
-
-            label_keys = [h for h in fields if h != id_key]
-            label_names = label_keys
-
-            for row in reader:
-                iid = str(row[id_key]).strip()
-                if not iid:
-                    continue
-                vec: list[float] = []
-                for key in label_keys:
-                    raw = row.get(key, "")
-                    if raw is None or str(raw).strip() == "":
-                        vec.append(0.0)
-                    else:
-                        vec.append(float(int(float(str(raw).strip()))))
-                image_ids.append(iid)
-                label_matrix.append(vec)
-
-        if not image_ids:
-            raise ValueError("No rows parsed from labels CSV")
-
-        self.image_ids = tuple(image_ids)
-        self.label_names = tuple(label_names)
-        self.labels = np.asarray(label_matrix, dtype=np.float32)
+        self.image_ids, self.label_names, self.labels = load_rfmid_label_table(self.labels_csv)
 
     def __len__(self) -> int:
         return len(self.image_ids)

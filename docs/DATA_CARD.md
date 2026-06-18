@@ -41,10 +41,20 @@ python -m fed_agent.tools.download_rfmid --smoke-stream
 
 ## Federated splits (planned)
 
-- `split_noniid_dirichlet.json` — label skew across virtual clients  
-- `split_domain_shift.json` — group by camera / device metadata when available  
+- `split_noniid_dirichlet.json` — label skew across virtual clients (**CLI implemented**)  
+- `split_domain_shift.json` — if camera/device metadata exists in CSV, map that field; otherwise use **domain-hash** synthetic split (**CLI implemented**)  
 
-Scripts will live under `scripts/` (next: `build_splits.py`).
+Generate files:
+
+```bash
+python -m fed_agent.tools.build_splits \
+  --labels_csv data/raw/rfmid/RFMiD_Training_Labels.csv \
+  --out_dir configs/splits/generated \
+  --n_clients 8 \
+  --seed 0
+```
+
+See `configs/splits/README.md` for output layout.
 
 ## Optional
 

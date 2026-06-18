@@ -16,6 +16,14 @@ GitHub **不会**自动拉取你磁盘上未提交的改动；「同步」指两
 | [`scripts/push-current-branch.sh`](../scripts/push-current-branch.sh) | 推送**当前分支**到 `origin` 并设置上游 |
 | [`scripts/push-github.sh`](../scripts/push-github.sh) | 仅推送 `main` 与 `dev`（里程碑/发版用） |
 | [`scripts/publish.sh`](../scripts/publish.sh) | **先 sync 再 push 当前分支**（最常用的一键） |
+| [`scripts/smoke.sh`](../scripts/smoke.sh) | **本地 smoke**：`ruff` + `pytest`（建议每次 push 前执行） |
+
+## 推送前自检（推荐）
+
+```bash
+./scripts/smoke.sh
+./scripts/publish.sh
+```
 
 ## 分支习惯（与 `docs/BRANCHING.md` 一致）
 
