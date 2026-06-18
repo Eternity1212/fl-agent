@@ -1,0 +1,7 @@
+# Placeholder — expand per project plan (noise × nonIID × method × seed)
+version: 0
+defaults:
+  dataset: rfmid_v1
+  seeds: [0, 1, 2]
+  noise_protocol: noise_protocol@v1
+matrix: []
