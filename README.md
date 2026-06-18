@@ -11,6 +11,12 @@ This repo follows the technical plan: **P2 (RETFound + PEFT) headline**, **P1 (n
 
 See [docs/BRANCHING.md](docs/BRANCHING.md) and [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md) (auth + first push).
 
+After you add the SSH public key to GitHub (one-time, see `docs/GITHUB_SETUP.md`):
+
+```bash
+./scripts/push-github.sh
+```
+
 ## Local clone path (this machine)
 
 `/Users/bytedance/projects/fl-agent`
