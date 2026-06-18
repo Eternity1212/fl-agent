@@ -9,7 +9,11 @@ This repo follows the technical plan: **P2 (RETFound + PEFT) headline**, **P1 (n
 - `dev` — integration branch; merge via PR from `feat/*`.
 - `feat/*` — short-lived feature branches.
 
-See [docs/BRANCHING.md](docs/BRANCHING.md).
+See [docs/BRANCHING.md](docs/BRANCHING.md) and [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md) (auth + first push).
+
+## Local clone path (this machine)
+
+`/Users/bytedance/projects/fl-agent`
 
 ## Data (not committed)
 
