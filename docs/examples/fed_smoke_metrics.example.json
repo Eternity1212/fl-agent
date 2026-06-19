@@ -1,0 +1,11 @@
+{
+  "rounds": [0, 1],
+  "comm_bytes_upload_per_round": [123456, 123456],
+  "mean_train_loss_clients": [0.712345, 0.698765],
+  "noise_protocol": {
+    "path": "configs/noise_protocol/example_v1.yaml",
+    "symmetric_flip_p_flip": 0.0
+  },
+  "final_state_dict_keys": ["net.0.weight", "net.0.bias", "net.2.weight", "net.2.bias"],
+  "total_upload_bytes": 246912
+}
