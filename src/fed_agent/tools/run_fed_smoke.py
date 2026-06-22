@@ -22,8 +22,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--image_size", type=int, nargs=2, default=[32, 32])
     p.add_argument("--device", type=str, default="cpu")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--model", type=str, default="mlp", choices=["mlp", "tiny_cnn"])
+    p.add_argument("--loss", type=str, default="bce", choices=["bce", "balanced_bce"])
+    p.add_argument("--threshold", type=float, default=0.5)
     p.add_argument("--noise_protocol_yaml", type=Path, default=None)
     p.add_argument("--label_noise_seed", type=int, default=0)
+    p.add_argument("--eval_labels_csv", type=Path, default=None)
+    p.add_argument("--eval_images_dir", type=Path, default=None)
     p.add_argument("--out_json", type=Path, default=None)
     args = p.parse_args(argv)
 
@@ -35,6 +40,9 @@ def main(argv: list[str] | None = None) -> int:
         fedprox_mu=float(args.fedprox_mu),
         device=str(args.device),
         seed=int(args.seed),
+        model=str(args.model),
+        loss=str(args.loss),
+        threshold=float(args.threshold),
     )
 
     metrics = run_multilabel_fed_smoke(
@@ -45,6 +53,8 @@ def main(argv: list[str] | None = None) -> int:
         cfg=cfg,
         noise_protocol_yaml=args.noise_protocol_yaml,
         label_noise_seed=int(args.label_noise_seed),
+        eval_labels_csv=args.eval_labels_csv,
+        eval_images_dir=args.eval_images_dir,
     )
     text = json.dumps(metrics, indent=2, ensure_ascii=False) + "\n"
     print(text)

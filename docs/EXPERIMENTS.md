@@ -34,6 +34,13 @@
 - **真实 RFMiD 子集 smoke**：`docs/results/rfmid_subset_smoke_latest.md`
 - 原始 JSON / CSV 默认写入 `runs/`，该目录被 `.gitignore` 忽略；可提交的脱敏摘要放在 `docs/results/`。
 
+### 当前值得放大的方向
+
+在真实 RFMiD head-12 疾病子集上，`balanced_bce + p=0.1 positive-label dropout + FedProx`
+相对 BCE baseline 的 validation best-threshold macro-F1 有初步提升（约 `+6.78%`）。
+这说明 **“类别不均衡 + 轻量标签噪声正则 + 联邦约束”** 是下一阶段最值得放大的方向。
+论文级实验需要把该方向迁移到 **RETFound + LoRA**，并用全量 train/validation/test 与多 seed 确认。
+
 ### 尚未作为一等公民的（v0.4+）
 
 - 验证集 macro-F1 / mAP、按病种分层指标；留一中心；校准曲线。
@@ -60,6 +67,7 @@
 
 - **Foundation + PEFT**：RETFound frozen backbone vs LoRA rank {4, 8, 16}。
 - **Noise module**：无噪声建模 vs 对称噪声 vs 类条件噪声 / FedDiv-style。
+- **Positive-label dropout / label-noise regularization**：p={0, 0.05, 0.1, 0.2}，验证其在噪声鲁棒和长尾标签上的收益。
 - **Agent scheduler**：固定规则 FL vs RuleAgent / bandit action（客户端采样、聚合权重、通信预算）。
 - **Communication accounting**：上传全模型 vs 只上传 LoRA adapter；报告字节数与性能曲线。
 - **Non-IID decomposition**：IID、Dirichlet α={0.1, 0.5, 1.0}、domain-hash / 真实设备域。

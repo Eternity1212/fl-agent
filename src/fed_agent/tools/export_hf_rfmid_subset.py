@@ -10,6 +10,8 @@ from pathlib import Path
 HF_REPO_ID = "ctmedtech/RFMID"
 TRAIN_LABELS = "Training_Set/Training_Set/RFMiD_Training_Labels.csv"
 TRAIN_IMAGE_PREFIX = "Training_Set/Training_Set/Training"
+VAL_LABELS = "Evaluation_Set/Evaluation_Set/RFMiD_Validation_Labels.csv"
+VAL_IMAGE_PREFIX = "Evaluation_Set/Evaluation_Set/Validation"
 
 
 def _clean_header(name: str) -> str:
@@ -52,16 +54,30 @@ def _select_diverse_rows(
     return sorted(selected, key=lambda r: int(str(r[id_key]).strip()))
 
 
-def export_hf_rfmid_subset(*, out_dir: Path, max_samples: int = 96) -> tuple[Path, Path]:
+def export_hf_rfmid_subset(
+    *,
+    out_dir: Path,
+    max_samples: int = 96,
+    split: str = "train",
+) -> tuple[Path, Path]:
     """Download labels + selected images and write ``labels.csv`` / ``images`` folder."""
 
     from huggingface_hub import hf_hub_download
+
+    if split == "train":
+        labels_name = TRAIN_LABELS
+        image_prefix = TRAIN_IMAGE_PREFIX
+    elif split == "validation":
+        labels_name = VAL_LABELS
+        image_prefix = VAL_IMAGE_PREFIX
+    else:
+        raise ValueError("split must be one of: train, validation")
 
     out_dir = Path(out_dir)
     images_dir = out_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
 
-    labels_path = hf_hub_download(repo_id=HF_REPO_ID, repo_type="dataset", filename=TRAIN_LABELS)
+    labels_path = hf_hub_download(repo_id=HF_REPO_ID, repo_type="dataset", filename=labels_name)
     with open(labels_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None:
@@ -94,7 +110,7 @@ def export_hf_rfmid_subset(*, out_dir: Path, max_samples: int = 96) -> tuple[Pat
         src = hf_hub_download(
             repo_id=HF_REPO_ID,
             repo_type="dataset",
-            filename=f"{TRAIN_IMAGE_PREFIX}/{image_id}.png",
+            filename=f"{image_prefix}/{image_id}.png",
         )
         shutil.copyfile(src, images_dir / f"{image_id}.png")
 
@@ -105,11 +121,13 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Export a small real RFMiD subset from HF mirror.")
     p.add_argument("--out_dir", type=Path, default=Path("data/raw/rfmid_hf_subset"))
     p.add_argument("--max_samples", type=int, default=96)
+    p.add_argument("--split", type=str, default="train", choices=["train", "validation"])
     args = p.parse_args(argv)
 
     labels_csv, images_dir = export_hf_rfmid_subset(
         out_dir=args.out_dir,
         max_samples=int(args.max_samples),
+        split=str(args.split),
     )
     print(f"Wrote labels_csv: {labels_csv}")
     print(f"Wrote images_dir: {images_dir}")
