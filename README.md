@@ -63,6 +63,16 @@ python3 -m pytest -q
 ./scripts/run_synthetic_ablations.sh
 ```
 
+**一条命令跑「真实 RFMiD 子集 smoke」**（从 Hugging Face 镜像导出 96 张真实图像）：
+
+```bash
+python3 -m pip install -e ".[data,torch]"
+./scripts/run_rfmid_subset_smoke.sh
+```
+
+产物：`docs/results/rfmid_subset_smoke_latest.md`，以及被 gitignore 的
+`runs/rfmid_smoke_matrix/latest/summary.{json,csv}`。
+
 ```bash
 # Full test matrix including torch-only tests (installs torch)
 # ./scripts/smoke-torch.sh
