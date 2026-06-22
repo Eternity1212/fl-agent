@@ -1,4 +1,4 @@
-"""Export a small real RFMiD subset from the Hugging Face mirror to local layout."""
+"""Export RFMiD from the Hugging Face mirror to the local RFMiD layout."""
 
 from __future__ import annotations
 
@@ -12,6 +12,14 @@ TRAIN_LABELS = "Training_Set/Training_Set/RFMiD_Training_Labels.csv"
 TRAIN_IMAGE_PREFIX = "Training_Set/Training_Set/Training"
 VAL_LABELS = "Evaluation_Set/Evaluation_Set/RFMiD_Validation_Labels.csv"
 VAL_IMAGE_PREFIX = "Evaluation_Set/Evaluation_Set/Validation"
+TEST_LABELS = "Test_Set/Test_Set/RFMiD_Testing_Labels.csv"
+TEST_IMAGE_PREFIX = "Test_Set/Test_Set/Test"
+
+SPLIT_META = {
+    "train": (TRAIN_LABELS, TRAIN_IMAGE_PREFIX),
+    "validation": (VAL_LABELS, VAL_IMAGE_PREFIX),
+    "test": (TEST_LABELS, TEST_IMAGE_PREFIX),
+}
 
 
 def _clean_header(name: str) -> str:
@@ -54,24 +62,24 @@ def _select_diverse_rows(
     return sorted(selected, key=lambda r: int(str(r[id_key]).strip()))
 
 
+def _split_paths(split: str) -> tuple[str, str]:
+    if split not in SPLIT_META:
+        raise ValueError("split must be one of: train, validation, test")
+    return SPLIT_META[split]
+
+
 def export_hf_rfmid_subset(
     *,
     out_dir: Path,
-    max_samples: int = 96,
+    max_samples: int | None = 96,
     split: str = "train",
+    overwrite: bool = False,
 ) -> tuple[Path, Path]:
     """Download labels + selected images and write ``labels.csv`` / ``images`` folder."""
 
     from huggingface_hub import hf_hub_download
 
-    if split == "train":
-        labels_name = TRAIN_LABELS
-        image_prefix = TRAIN_IMAGE_PREFIX
-    elif split == "validation":
-        labels_name = VAL_LABELS
-        image_prefix = VAL_IMAGE_PREFIX
-    else:
-        raise ValueError("split must be one of: train, validation")
+    labels_name, image_prefix = _split_paths(split)
 
     out_dir = Path(out_dir)
     images_dir = out_dir / "images"
@@ -91,12 +99,15 @@ def export_hf_rfmid_subset(
     if id_key not in raw_fields:
         raise ValueError(f"Could not find ID column in RFMiD CSV: {raw_fields[:5]}")
     label_keys = [k for k in raw_fields if k != id_key]
-    selected = _select_diverse_rows(
-        rows,
-        id_key=id_key,
-        label_keys=label_keys,
-        max_samples=int(max_samples),
-    )
+    if max_samples is None or int(max_samples) <= 0:
+        selected = sorted(rows, key=lambda r: int(str(r[id_key]).strip()))
+    else:
+        selected = _select_diverse_rows(
+            rows,
+            id_key=id_key,
+            label_keys=label_keys,
+            max_samples=int(max_samples),
+        )
 
     labels_out = out_dir / "labels.csv"
     with labels_out.open("w", newline="", encoding="utf-8") as f:
@@ -112,25 +123,96 @@ def export_hf_rfmid_subset(
             repo_type="dataset",
             filename=f"{image_prefix}/{image_id}.png",
         )
-        shutil.copyfile(src, images_dir / f"{image_id}.png")
+        dst = images_dir / f"{image_id}.png"
+        if dst.is_file() and not overwrite:
+            continue
+        shutil.copyfile(src, dst)
 
     return labels_out, images_dir
 
 
+def export_hf_rfmid_all(
+    *,
+    out_dir: Path,
+    max_samples: int | None = None,
+    overwrite: bool = False,
+) -> dict[str, tuple[Path, Path]]:
+    """Export train/validation/test into ``out_dir/<split>/labels.csv`` + ``images``."""
+
+    root = Path(out_dir)
+    out: dict[str, tuple[Path, Path]] = {}
+    for split in ("train", "validation", "test"):
+        out[split] = export_hf_rfmid_subset(
+            out_dir=root / split,
+            max_samples=max_samples,
+            split=split,
+            overwrite=overwrite,
+        )
+    return out
+
+
+def validate_rfmid_layout(root: Path) -> dict[str, int]:
+    """Return row counts for a local full RFMiD layout, raising if files are missing."""
+
+    from fed_agent.data.rfmid import load_rfmid_label_table
+
+    root = Path(root)
+    counts: dict[str, int] = {}
+    for split in ("train", "validation", "test"):
+        labels_csv = root / split / "labels.csv"
+        images_dir = root / split / "images"
+        if not labels_csv.is_file():
+            raise FileNotFoundError(f"Missing {split} labels: {labels_csv}")
+        if not images_dir.is_dir():
+            raise FileNotFoundError(f"Missing {split} images dir: {images_dir}")
+        image_ids, _labels, _y = load_rfmid_label_table(labels_csv)
+        missing = [sid for sid in image_ids if not (images_dir / f"{sid}.png").is_file()]
+        if missing:
+            msg = f"{split}: missing {len(missing)} image files, first={missing[0]}"
+            raise FileNotFoundError(msg)
+        counts[split] = len(image_ids)
+    return counts
+
+
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Export a small real RFMiD subset from HF mirror.")
+    p = argparse.ArgumentParser(description="Export RFMiD from HF mirror into local layout.")
     p.add_argument("--out_dir", type=Path, default=Path("data/raw/rfmid_hf_subset"))
-    p.add_argument("--max_samples", type=int, default=96)
-    p.add_argument("--split", type=str, default="train", choices=["train", "validation"])
+    p.add_argument(
+        "--max_samples",
+        type=int,
+        default=96,
+        help="Per-split sample cap. Use 0 for full split.",
+    )
+    p.add_argument(
+        "--split",
+        type=str,
+        default="train",
+        choices=["train", "validation", "test", "all"],
+    )
+    p.add_argument("--overwrite", action="store_true")
+    p.add_argument("--validate", action="store_true")
     args = p.parse_args(argv)
 
-    labels_csv, images_dir = export_hf_rfmid_subset(
-        out_dir=args.out_dir,
-        max_samples=int(args.max_samples),
-        split=str(args.split),
-    )
-    print(f"Wrote labels_csv: {labels_csv}")
-    print(f"Wrote images_dir: {images_dir}")
+    max_samples = None if int(args.max_samples) <= 0 else int(args.max_samples)
+    if args.split == "all":
+        payload = export_hf_rfmid_all(
+            out_dir=args.out_dir,
+            max_samples=max_samples,
+            overwrite=bool(args.overwrite),
+        )
+        for split, (labels_csv, images_dir) in payload.items():
+            print(f"{split}: labels_csv={labels_csv} images_dir={images_dir}")
+        if args.validate:
+            print("counts:", validate_rfmid_layout(args.out_dir))
+    else:
+        labels_csv, images_dir = export_hf_rfmid_subset(
+            out_dir=args.out_dir,
+            max_samples=max_samples,
+            split=str(args.split),
+            overwrite=bool(args.overwrite),
+        )
+        print(f"Wrote labels_csv: {labels_csv}")
+        print(f"Wrote images_dir: {images_dir}")
     return 0
 
 

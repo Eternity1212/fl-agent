@@ -1,0 +1,115 @@
+version: paper_matrix.v1
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  test_labels_csv: data/raw/rfmid_full/test/labels.csv
+  test_images_dir: data/raw/rfmid_full/test/images
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+defaults:
+  backbone: mlp
+  image_size: [16, 16]
+  batch_size: 32
+  epochs: 1
+  rounds: 1
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 4
+  lora_alpha: 8.0
+  fedprox_mu: 0.05
+  device: cpu
+  require_retfound: false
+
+runs:
+  - name: full46_centralized_mlp_s0
+    method: centralized
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+  - name: full46_local_only_mlp_s0
+    method: local_only
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+    split_json: configs/splits/generated/labels__iid_K4_S0.json
+  - name: full46_fedavg_mlp_s0
+    method: fedavg
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+    split_json: configs/splits/generated/labels__iid_K4_S0.json
+  - name: full46_fedprox_mlp_s0
+    method: fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+    split_json: configs/splits/generated/labels__iid_K4_S0.json
+  - name: full46_robust_fedprox_mlp_dropout01_s0
+    method: robust_fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.1
+    split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+  - name: full46_centralized_mlp_s1
+    method: centralized
+    seed: 1
+    loss: balanced_bce
+    positive_dropout: 0.0
+  - name: full46_local_only_mlp_s1
+    method: local_only
+    seed: 1
+    loss: balanced_bce
+    positive_dropout: 0.0
+    split_json: configs/splits/generated/labels__iid_K4_S1.json
+  - name: full46_fedavg_mlp_s1
+    method: fedavg
+    seed: 1
+    loss: balanced_bce
+    positive_dropout: 0.0
+    split_json: configs/splits/generated/labels__iid_K4_S1.json
+  - name: full46_fedprox_mlp_s1
+    method: fedprox
+    seed: 1
+    loss: balanced_bce
+    positive_dropout: 0.0
+    split_json: configs/splits/generated/labels__iid_K4_S1.json
+  - name: full46_robust_fedprox_mlp_dropout01_s1
+    method: robust_fedprox
+    seed: 1
+    loss: balanced_bce
+    positive_dropout: 0.1
+    split_json: configs/splits/generated/labels__iid_K4_S1.json
+
+  - name: full46_centralized_mlp_s2
+    method: centralized
+    seed: 2
+    loss: balanced_bce
+    positive_dropout: 0.0
+  - name: full46_local_only_mlp_s2
+    method: local_only
+    seed: 2
+    loss: balanced_bce
+    positive_dropout: 0.0
+    split_json: configs/splits/generated/labels__iid_K4_S2.json
+  - name: full46_fedavg_mlp_s2
+    method: fedavg
+    seed: 2
+    loss: balanced_bce
+    positive_dropout: 0.0
+    split_json: configs/splits/generated/labels__iid_K4_S2.json
+  - name: full46_fedprox_mlp_s2
+    method: fedprox
+    seed: 2
+    loss: balanced_bce
+    positive_dropout: 0.0
+    split_json: configs/splits/generated/labels__iid_K4_S2.json
+  - name: full46_robust_fedprox_mlp_dropout01_s2
+    method: robust_fedprox
+    seed: 2
+    loss: balanced_bce
+    positive_dropout: 0.1
+    split_json: configs/splits/generated/labels__iid_K4_S2.json

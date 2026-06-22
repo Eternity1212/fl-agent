@@ -73,6 +73,36 @@ python3 -m pip install -e ".[data,torch]"
 产物：`docs/results/rfmid_subset_smoke_latest.md`，以及被 gitignore 的
 `runs/rfmid_smoke_matrix/latest/summary.{json,csv}`。
 
+**RETFound + LoRA 论文级管线（v0.4）**：
+
+```bash
+python3 -m pip install -e ".[data,torch,paper]"
+
+# 下载完整 RFMiD train/validation/test（支持断点跳过已存在图片）
+python3 -m fed_agent.tools.export_hf_rfmid_subset \
+  --split all --out_dir data/raw/rfmid_full --max_samples 0 --validate
+
+# head-12 快速 sanity：当前会清楚标记 RETFound=False fallback 结果
+./scripts/run_paper_pilot.sh
+
+# full-46 MLP fallback 主矩阵；正式 RETFound 主矩阵见 configs/paper_matrix.yaml
+./scripts/run_paper_full46_mlp.sh
+```
+
+产物：`docs/results/paper_matrix_pilot_head12.md`、
+`docs/results/paper_matrix_full46_mlp.md`（运行 full 脚本后生成）和
+`runs/paper_matrix/*/summary.{json,csv}`。
+
+**真正的 RETFound 论文主结果（需 GPU + HF token）**：RETFound 权重是 Hugging Face
+gated 仓库，需先申请权限并配置 `HF_TOKEN`。完整步骤见
+**[docs/RETFOUND_GPU_RUN.md](docs/RETFOUND_GPU_RUN.md)**，迁移到 GPU 机器后：
+
+```bash
+export HF_TOKEN=hf_你的token
+python3 -m fed_agent.tools.check_env   # 预检 GPU / token / gated 访问
+./scripts/run_paper_gpu.sh             # 一键跑 configs/paper_matrix.yaml
+```
+
 ```bash
 # Full test matrix including torch-only tests (installs torch)
 # ./scripts/smoke-torch.sh

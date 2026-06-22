@@ -1,6 +1,8 @@
 # 实验设计（如何从现在走到论文级）
 
-当前代码处于 **v0.3 联邦 smoke + 噪声协议接线**：适合做 **管线验证** 与 **通信字节 / loss 曲线** 的预实验；**尚未**内置 RETFound 训练循环。
+当前代码已进入 **v0.4 RETFound + LoRA 论文级管线**：已具备完整 RFMiD 导出、
+RETFound/ViT+LoRA 模型工厂、centralized/local/federated runner、paper matrix 和汇总工具。
+若 RETFound gated 权重未授权，系统会明确标记为 fallback，不能作为论文 RETFound 主结果。
 
 ## 1. 实验是否「开始」了？
 
@@ -9,8 +11,8 @@
 | A. **合成最小 baseline**（4 样本、2 客户端、TinyMLP） | 已可跑：`minimal_experiment` / `scripts/run_minimal_baseline.sh` |
 | A2. **合成消融/对比实验**（FedAvg vs FedProx × 噪声） | 已开始并产出报告：`scripts/run_numpy_ablations.sh`、`scripts/run_synthetic_ablations.sh` |
 | B0. **真实 RFMiD 子集 smoke**（HF 96 张子集） | 已开始并产出报告：`scripts/run_rfmid_subset_smoke.sh` |
-| B. **真实 RFMiD 全量**（训练/验证/测试、多 seed） | 需扩展为全量矩阵和验证/测试指标 |
-| C. **论文主表**（非 IID × 噪声 × 方法 × seed） | 依赖 B + 后续模型与聚合策略扩展 |
+| B. **真实 RFMiD 全量**（训练/验证/测试、多 seed） | 已实现导出/校验并完成 full-46 MLP fallback 多 seed 矩阵 |
+| C. **论文主表**（非 IID × 噪声 × 方法 × seed） | RETFound 主表依赖 HF gated 权重授权；fallback sanity 已可跑 |
 
 ## 2. 推荐实验因子（之后扩展 RETFound 仍沿用框架）
 
@@ -32,6 +34,8 @@
 - **NumPy 后端（无需 torch）**：`docs/results/numpy_synthetic_ablation_latest.md`
 - **Torch/TinyMLP 后端**：`docs/results/synthetic_ablation_latest.md`
 - **真实 RFMiD 子集 smoke**：`docs/results/rfmid_subset_smoke_latest.md`
+- **RETFound/LoRA paper pilot fallback**：`docs/results/paper_matrix_pilot_head12.md`
+- **full-46 MLP fallback 多 seed 主矩阵**：`docs/results/paper_matrix_full46_mlp.md`
 - 原始 JSON / CSV 默认写入 `runs/`，该目录被 `.gitignore` 忽略；可提交的脱敏摘要放在 `docs/results/`。
 
 ### 当前值得放大的方向
@@ -41,9 +45,17 @@
 这说明 **“类别不均衡 + 轻量标签噪声正则 + 联邦约束”** 是下一阶段最值得放大的方向。
 论文级实验需要把该方向迁移到 **RETFound + LoRA**，并用全量 train/validation/test 与多 seed 确认。
 
-### 尚未作为一等公民的（v0.4+）
+full-46 MLP fallback 主矩阵已完成，FedProx 的 best macro-F1 均值为
+`0.071905 +/- 0.000395`，略高于 FedAvg 的 `0.070703 +/- 0.000433`。
+但所有行均为 `RETFound=False`，只能证明工程链路可跑通，不能作为论文主结果。
 
-- 验证集 macro-F1 / mAP、按病种分层指标；留一中心；校准曲线。
+### v0.4 已新增
+
+- `src/fed_agent/models/retfound_lora.py`：RETFound 权限检测、timm fallback、LoRA 注入。
+- `src/fed_agent/metrics/multilabel.py`：micro/macro-F1、validation threshold 校准、mAP/macro-AUROC。
+- `src/fed_agent/train/paper_runner.py`：centralized、local-only、FedAvg/FedProx、robust FedProx runner。
+- `configs/paper_matrix.yaml`：正式 RETFound 主矩阵入口。
+- `configs/paper_matrix_pilot.yaml`、`configs/paper_matrix_full46_mlp.yaml`：sanity/fallback 矩阵。
 
 ## 3. 单次「真实数据」实验流程（建议）
 

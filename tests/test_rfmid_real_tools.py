@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from fed_agent.tools.export_hf_rfmid_subset import _select_diverse_rows
+from pathlib import Path
+
+from PIL import Image
+
+from fed_agent.tools.export_hf_rfmid_subset import _select_diverse_rows, validate_rfmid_layout
 from fed_agent.tools.run_rfmid_smoke_matrix import _report
 
 
@@ -18,6 +22,18 @@ def test_select_diverse_rows_round_robin_by_disease() -> None:
         max_samples=2,
     )
     assert [r["ID"] for r in out] == ["1", "3"]
+
+
+def test_validate_rfmid_layout(tmp_path: Path) -> None:
+    for split in ["train", "validation", "test"]:
+        d = tmp_path / split
+        img = d / "images"
+        img.mkdir(parents=True)
+        (d / "labels.csv").write_text("ImageID,A\n1,1\n", encoding="utf-8")
+        Image.new("RGB", (2, 2)).save(img / "1.png")
+
+    counts = validate_rfmid_layout(tmp_path)
+    assert counts == {"train": 1, "validation": 1, "test": 1}
 
 
 def test_rfmid_smoke_report_contains_method_sections() -> None:

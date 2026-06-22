@@ -1,0 +1,51 @@
+version: paper_matrix.v1
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  test_labels_csv: data/raw/rfmid_full/test/labels.csv
+  test_images_dir: data/raw/rfmid_full/test/images
+  split_json: configs/splits/generated/rfmid_full__iid_K4_S0.json
+
+defaults:
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 8
+  epochs: 1
+  rounds: 1
+  local_epochs: 1
+  lr: 0.0001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.05
+  device: cuda
+  require_retfound: true
+
+runs:
+  - name: centralized_lora_bce_s0
+    method: centralized
+    seed: 0
+    loss: bce
+    positive_dropout: 0.0
+  - name: local_only_lora_bce_s0
+    method: local_only
+    seed: 0
+    loss: bce
+    positive_dropout: 0.0
+  - name: fedavg_lora_bce_s0
+    method: fedavg
+    seed: 0
+    loss: bce
+    positive_dropout: 0.0
+  - name: fedprox_lora_balanced_s0
+    method: fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+  - name: robust_fedprox_lora_dropout01_s0
+    method: robust_fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.1

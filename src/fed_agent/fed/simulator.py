@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, Subset
 from fed_agent.data.rfmid import load_rfmid_label_table
 from fed_agent.data.rfmid_torch import RFMiDTorchDataset
 from fed_agent.fed.aggregators import fedavg_state_dict, state_dict_nbytes
+from fed_agent.metrics.multilabel import multilabel_classification_metrics
 from fed_agent.noise.protocol import load_noise_protocol_yaml, parse_noise_protocol_v1
 from fed_agent.splits.partition import read_split_json
 
@@ -83,47 +84,6 @@ def _pos_weight_from_labels(labels_csv: Path) -> torch.Tensor:
     return torch.clamp(w, min=1.0, max=20.0)
 
 
-def _f1_scores(y_true: torch.Tensor, y_prob: torch.Tensor, *, threshold: float) -> dict[str, float]:
-    yt = (y_true.cpu().numpy() > 0.5).astype("int64")
-    yp = (y_prob.cpu().numpy() >= float(threshold)).astype("int64")
-
-    tp = (yt * yp).sum()
-    fp = ((1 - yt) * yp).sum()
-    fn = (yt * (1 - yp)).sum()
-    micro = float((2 * tp) / max((2 * tp + fp + fn), 1))
-
-    per_label: list[float] = []
-    for j in range(int(yt.shape[1])):
-        yt_j = yt[:, j]
-        yp_j = yp[:, j]
-        if yt_j.sum() == 0:
-            continue
-        tp_j = int((yt_j * yp_j).sum())
-        fp_j = int(((1 - yt_j) * yp_j).sum())
-        fn_j = int((yt_j * (1 - yp_j)).sum())
-        per_label.append(float((2 * tp_j) / max((2 * tp_j + fp_j + fn_j), 1)))
-
-    macro_present = float(sum(per_label) / len(per_label)) if per_label else 0.0
-    return {"micro_f1": micro, "macro_f1_present": macro_present}
-
-
-def _best_threshold_scores(y_true: torch.Tensor, y_prob: torch.Tensor) -> dict[str, float]:
-    best_t = 0.5
-    best_macro = -1.0
-    best_micro = 0.0
-    for t in [i / 100.0 for i in range(5, 96, 5)]:
-        scores = _f1_scores(y_true, y_prob, threshold=t)
-        if scores["macro_f1_present"] > best_macro:
-            best_t = t
-            best_macro = scores["macro_f1_present"]
-            best_micro = scores["micro_f1"]
-    return {
-        "best_threshold": float(best_t),
-        "best_macro_f1_present": float(best_macro),
-        "best_micro_f1": float(best_micro),
-    }
-
-
 def _evaluate(
     model: nn.Module,
     loader: DataLoader,
@@ -150,9 +110,20 @@ def _evaluate(
         return {"loss": float("nan"), "micro_f1": 0.0, "macro_f1_present": 0.0}
     y_cat = torch.cat(y_all, dim=0)
     p_cat = torch.cat(p_all, dim=0)
-    scores = _f1_scores(y_cat, p_cat, threshold=float(cfg.threshold))
-    best = _best_threshold_scores(y_cat, p_cat)
-    return {"loss": float(sum(losses) / len(losses)), **scores, **best}
+    scores = multilabel_classification_metrics(
+        y_cat.numpy(),
+        p_cat.numpy(),
+        threshold=float(cfg.threshold),
+        calibrate=True,
+    )
+    return {
+        "loss": float(sum(losses) / len(losses)),
+        "micro_f1": float(scores["micro_f1"]),
+        "macro_f1_present": float(scores["macro_f1_present"]),
+        "best_threshold": float(scores["best_threshold"]),
+        "best_micro_f1": float(scores["best_micro_f1"]),
+        "best_macro_f1_present": float(scores["best_macro_f1_present"]),
+    }
 
 
 def _local_train_one_client(
