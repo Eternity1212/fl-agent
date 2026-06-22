@@ -4,8 +4,20 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import shutil
 from pathlib import Path
+
+
+def resolve_hf_token() -> str | None:
+    """Read a Hugging Face token from common env vars (None if unset)."""
+
+    for key in ("HF_TOKEN", "HUGGINGFACE_TOKEN", "HUGGING_FACE_HUB_TOKEN"):
+        value = os.environ.get(key)
+        if value:
+            return value.strip()
+    return None
+
 
 HF_REPO_ID = "ctmedtech/RFMID"
 TRAIN_LABELS = "Training_Set/Training_Set/RFMiD_Training_Labels.csv"
@@ -85,7 +97,13 @@ def export_hf_rfmid_subset(
     images_dir = out_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
 
-    labels_path = hf_hub_download(repo_id=HF_REPO_ID, repo_type="dataset", filename=labels_name)
+    token = resolve_hf_token()
+    labels_path = hf_hub_download(
+        repo_id=HF_REPO_ID,
+        repo_type="dataset",
+        filename=labels_name,
+        token=token,
+    )
     with open(labels_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None:
@@ -118,14 +136,15 @@ def export_hf_rfmid_subset(
 
     for row in selected:
         image_id = str(row[id_key]).strip()
+        dst = images_dir / f"{image_id}.png"
+        if dst.is_file() and not overwrite:
+            continue
         src = hf_hub_download(
             repo_id=HF_REPO_ID,
             repo_type="dataset",
             filename=f"{image_prefix}/{image_id}.png",
+            token=token,
         )
-        dst = images_dir / f"{image_id}.png"
-        if dst.is_file() and not overwrite:
-            continue
         shutil.copyfile(src, dst)
 
     return labels_out, images_dir

@@ -23,6 +23,25 @@ Legacy: push only `main` + `dev`:
 ./scripts/push-github.sh
 ```
 
+## 一条命令跑全部（推荐入口）
+
+clone 到任意机器后，直接：
+
+```bash
+./run.sh
+```
+
+它会自动安装依赖、下载并校验完整 RFMiD、生成联邦划分、（有 `HF_TOKEN`+GPU 时）
+下载 RETFound 权重并跑论文矩阵，否则跑 MLP fallback，最后汇总所有结果。
+
+- 有 token：`export HF_TOKEN=hf_xxx && ./run.sh` → 真正 RETFound 结果
+- 无 token：`./run.sh` → fallback sanity（结果标记 `RETFound=False`，不能写论文）
+- 常用变量：`MODE=auto|retfound|fallback`、`SKIP_INSTALL=1`、`SEEDS="0 1 2"`
+
+> **数据集与模型权重不放进 Git**（许可与体积原因），由 `run.sh` 运行时从官方源
+> 自动下载。RETFound 是 gated 仓库，需先在网页同意条款并配置 token，详见
+> [docs/RETFOUND_GPU_RUN.md](docs/RETFOUND_GPU_RUN.md)。
+
 ## Local clone path (this machine)
 
 `/Users/bytedance/projects/fl-agent`

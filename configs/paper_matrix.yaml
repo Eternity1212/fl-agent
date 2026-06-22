@@ -7,7 +7,7 @@ dataset:
   validation_images_dir: data/raw/rfmid_full/validation/images
   test_labels_csv: data/raw/rfmid_full/test/labels.csv
   test_images_dir: data/raw/rfmid_full/test/images
-  split_json: configs/splits/generated/rfmid_full__iid_K4_S0.json
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
 
 defaults:
   backbone: retfound_mae_vit_large
