@@ -53,6 +53,16 @@ python3 -m pytest -q
 
 产物：`runs/minimal/metrics.json`（默认 gitignore）与可提交的摘要 `docs/results/minimal_synthetic_baseline.md`（脚本运行后更新）。
 
+**一条命令跑「合成消融/对比实验」**：
+
+```bash
+# 无需 torch，立刻产出 docs/results/numpy_synthetic_ablation_latest.md
+./scripts/run_numpy_ablations.sh
+
+# Torch/TinyMLP 版，产出 docs/results/synthetic_ablation_latest.md
+./scripts/run_synthetic_ablations.sh
+```
+
 ```bash
 # Full test matrix including torch-only tests (installs torch)
 # ./scripts/smoke-torch.sh

@@ -1,0 +1,3 @@
+version: "noise_protocol@v1"
+symmetric_flip_on_positives:
+  p_flip: 0.1

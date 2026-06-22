@@ -6,7 +6,8 @@
 
 | 类型 | 状态 |
 |------|------|
-| A. **合成最小 baseline**（4 样本、2 客户端、TinyMLP） | 可随时跑：`minimal_experiment` / `scripts/run_minimal_baseline.sh` |
+| A. **合成最小 baseline**（4 样本、2 客户端、TinyMLP） | 已可跑：`minimal_experiment` / `scripts/run_minimal_baseline.sh` |
+| A2. **合成消融/对比实验**（FedAvg vs FedProx × 噪声） | 已开始并产出报告：`scripts/run_numpy_ablations.sh`、`scripts/run_synthetic_ablations.sh` |
 | B. **真实 RFMiD**（训练集全量或子集、多 seed） | 需先完成数据下载与划分 JSON，再组矩阵 |
 | C. **论文主表**（非 IID × 噪声 × 方法 × seed） | 依赖 B + 后续模型与聚合策略扩展 |
 
@@ -17,13 +18,19 @@
 - **划分 / 异质性**：IID vs Dirichlet α vs domain-hash（已有 `build_splits`）。
 - **标签噪声**：`noise_protocol@v1` 中 `p_flip` 若干档（如 0, 0.1, 0.2）。
 - **联邦算法**：FedAvg vs FedProx（`fedprox_mu` 网格，如 0, 0.01, 0.1）。
-- **随机种子**：`label_noise_seed`、划分 `seed`、全局 `torch.manual_seed`（后续统一进配置）。
+- **随机种子**：`label_noise_seed`、划分 `seed`、`FedSmokeConfig.seed`。
 
 ### 因变量（当前 smoke 已支持）
 
 - `mean_train_loss_clients`（每轮客户端平均训练损失）
 - `comm_bytes_upload_per_round`、`total_upload_bytes`
 - `noise_protocol` 元数据（若启用 YAML）
+
+### 当前已生成的合成实验结果
+
+- **NumPy 后端（无需 torch）**：`docs/results/numpy_synthetic_ablation_latest.md`
+- **Torch/TinyMLP 后端**：`docs/results/synthetic_ablation_latest.md`
+- 原始 JSON / CSV 默认写入 `runs/`，该目录被 `.gitignore` 忽略；可提交的脱敏摘要放在 `docs/results/`。
 
 ### 尚未作为一等公民的（v0.4+）
 

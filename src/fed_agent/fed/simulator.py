@@ -23,6 +23,7 @@ class FedSmokeConfig:
     lr: float = 0.05
     fedprox_mu: float = 0.0
     device: str = "cpu"
+    seed: int = 0
 
 
 class TinyMLP(nn.Module):
@@ -127,6 +128,7 @@ def run_multilabel_fed_smoke(
     clients: dict[str, list[str]] = split["clients"]
     client_keys = sorted(clients.keys(), key=lambda k: int(k))
 
+    torch.manual_seed(int(cfg.seed))
     global_model = TinyMLP(in_dim=in_dim, n_labels=n_labels)
     global_sd = OrderedDict({k: v.detach().cpu() for k, v in global_model.state_dict().items()})
 
@@ -150,7 +152,14 @@ def run_multilabel_fed_smoke(
             if not idxs:
                 continue
             subset = Subset(ds, idxs)
-            loader = DataLoader(subset, batch_size=int(cfg.batch_size), shuffle=True)
+            generator = torch.Generator()
+            generator.manual_seed(int(cfg.seed) + r * 10_000 + int(ck))
+            loader = DataLoader(
+                subset,
+                batch_size=int(cfg.batch_size),
+                shuffle=True,
+                generator=generator,
+            )
 
             local_sd, mean_loss, _n = _local_train_one_client(
                 global_model,

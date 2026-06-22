@@ -65,10 +65,10 @@ class RFMiDTorchDataset(torch.utils.data.Dataset):
                 & 0xFFFFFFFF,
             )
             y_np = apply_symmetric_label_noise(
-                y_np,
+                y_np.reshape(1, -1),
                 rng=rng,
                 p_flip=float(self._label_noise_p_flip),
-            )
+            )[0]
         y = torch.from_numpy(y_np)
 
         meta = {"image_id": sample["image_id"], "label_names": sample["label_names"]}

@@ -21,6 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--fedprox_mu", type=float, default=0.0)
     p.add_argument("--image_size", type=int, nargs=2, default=[32, 32])
     p.add_argument("--device", type=str, default="cpu")
+    p.add_argument("--seed", type=int, default=0)
     p.add_argument("--noise_protocol_yaml", type=Path, default=None)
     p.add_argument("--label_noise_seed", type=int, default=0)
     p.add_argument("--out_json", type=Path, default=None)
@@ -33,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
         lr=float(args.lr),
         fedprox_mu=float(args.fedprox_mu),
         device=str(args.device),
+        seed=int(args.seed),
     )
 
     metrics = run_multilabel_fed_smoke(
