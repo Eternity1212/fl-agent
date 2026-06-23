@@ -23,7 +23,7 @@ defaults:
   epochs: 15
   rounds: 30
   local_epochs: 1
-  lr: 0.0001
+  lr: 0.001
   lora_rank: 8
   lora_alpha: 16.0
   fedprox_mu: 0.05

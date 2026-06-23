@@ -1,0 +1,60 @@
+version: paper_matrix.v1
+
+# Small REAL RETFound+LoRA run feasible on CPU (~1-1.5h). NOT a final paper
+# number: subset of full RFMiD (160 train / 80 val, head-12 labels), short
+# schedule. Purpose: check the relative noise-robustness signal locally.
+
+dataset:
+  train_labels_csv: data/raw/rfmid_sub/train/head12_labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_sub/validation/head12_labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  test_labels_csv: data/raw/rfmid_sub/validation/head12_labels.csv
+  test_images_dir: data/raw/rfmid_full/validation/images
+  split_json: configs/splits/generated/rfmid_sub_head12_iid_K4_S0.json
+
+defaults:
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 10
+  rounds: 10
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.05
+  device: cpu
+  require_retfound: true
+
+runs:
+  - name: cpu_centralized_clean
+    method: centralized
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+    train_label_noise: 0.0
+  - name: cpu_fedavg_clean
+    method: fedavg
+    seed: 0
+    loss: bce
+    positive_dropout: 0.0
+    train_label_noise: 0.0
+  - name: cpu_robust_fedprox_clean
+    method: robust_fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.1
+    train_label_noise: 0.0
+  - name: cpu_fedavg_noise02
+    method: fedavg
+    seed: 0
+    loss: bce
+    positive_dropout: 0.0
+    train_label_noise: 0.2
+  - name: cpu_robust_fedprox_noise02
+    method: robust_fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.1
+    train_label_noise: 0.2

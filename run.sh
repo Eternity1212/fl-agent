@@ -2,8 +2,11 @@
 # =============================================================================
 # fl-agent ONE-COMMAND runner
 # =============================================================================
-# 把这个仓库 clone 到任意机器后，运行:
+# 在一台全新的 (GPU) 机器上, 从零开始三步:
 #
+#     git clone git@github.com:Eternity1212/fl-agent.git
+#     cd fl-agent
+#     export HF_TOKEN=hf_xxx        # RETFound gated 权重所需 (见下)
 #     ./run.sh
 #
 # 它会自动:
@@ -102,9 +105,10 @@ if [[ -n "${PAPER_MATRIX_YAML:-}" ]]; then
   OUT_DIR="${PAPER_OUT_DIR:-runs/paper_matrix/${STEM}}"
   OUT_MD="${PAPER_OUT_MD:-docs/results/${STEM}.md}"
 elif [[ "${RUN_RETFOUND}" == "1" ]]; then
-  MATRIX_YAML="configs/paper_matrix.yaml"
-  OUT_DIR="runs/paper_matrix/retfound"
-  OUT_MD="docs/results/paper_matrix_retfound.md"
+  # Full paper matrix: comparison (3 seeds) + ablations (noise / non-IID / rank / mu)
+  MATRIX_YAML="configs/paper_matrix_gpu_full.yaml"
+  OUT_DIR="runs/paper_matrix/retfound_full"
+  OUT_MD="docs/results/paper_matrix_retfound_full.md"
 else
   MATRIX_YAML="configs/paper_matrix_full46_mlp.yaml"
   OUT_DIR="runs/paper_matrix/full46_mlp"

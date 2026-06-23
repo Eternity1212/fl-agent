@@ -1,0 +1,36 @@
+version: paper_matrix.v1
+
+# Diagnostic: can RETFound+LoRA actually learn on the subset with a stronger
+# recipe (more epochs, higher LR)? If AUROC climbs well above 0.6, the recipe
+# is sound and earlier near-chance was just undertraining (needs scale/GPU).
+
+dataset:
+  train_labels_csv: data/raw/rfmid_sub/train/head12_labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_sub/validation/head12_labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  test_labels_csv: data/raw/rfmid_sub/validation/head12_labels.csv
+  test_images_dir: data/raw/rfmid_full/validation/images
+  split_json: configs/splits/generated/rfmid_sub_head12_iid_K4_S0.json
+
+defaults:
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 10
+  rounds: 1
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.0
+  device: cpu
+  require_retfound: true
+
+runs:
+  - name: diag_centralized_lr1e3_e10
+    method: centralized
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+    train_label_noise: 0.0

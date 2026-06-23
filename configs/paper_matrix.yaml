@@ -12,11 +12,11 @@ dataset:
 defaults:
   backbone: retfound_mae_vit_large
   image_size: [224, 224]
-  batch_size: 8
-  epochs: 1
-  rounds: 1
+  batch_size: 16
+  epochs: 20
+  rounds: 40
   local_epochs: 1
-  lr: 0.0001
+  lr: 0.001
   lora_rank: 8
   lora_alpha: 16.0
   fedprox_mu: 0.05
