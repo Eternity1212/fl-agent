@@ -58,7 +58,8 @@ fi
 
 # ---- 2. 决定运行模式 ---------------------------------------------------------
 HAS_TOKEN=0
-if [[ -n "${HF_TOKEN:-}${HUGGINGFACE_TOKEN:-}${HUGGING_FACE_HUB_TOKEN:-}" ]]; then
+# A local checkpoint (RETFOUND_CKPT_PATH) OR an HF token both enable RETFound mode.
+if [[ -n "${HF_TOKEN:-}${HUGGINGFACE_TOKEN:-}${HUGGING_FACE_HUB_TOKEN:-}${RETFOUND_CKPT_PATH:-}" ]]; then
   HAS_TOKEN=1
 fi
 

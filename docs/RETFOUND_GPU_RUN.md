@@ -58,6 +58,24 @@ set -a; source .env; set +a
 huggingface-cli login --token hf_你的token
 ```
 
+方式 D（**上传本地权重，服务器无需 token / gated 授权**，推荐离线机器用）：
+
+如果你已经在别处下载好权重文件 `RETFound_mae_natureCFP.pth`（约 3.95 GB），
+直接上传到 GPU 服务器，然后用环境变量指过去即可，代码会优先用本地文件、
+完全跳过 Hugging Face 下载：
+
+```bash
+# 在本机找到权重并上传（示例用 scp，按你的服务器改）
+scp "/Users/bytedance/.cache/huggingface/hub/models--YukunZhou--RETFound_mae_natureCFP/snapshots/556830f78214f0e8da35af965292ac5a3180ac47/RETFound_mae_natureCFP.pth" \
+    user@gpu-server:/data/weights/RETFound_mae_natureCFP.pth
+
+# 在 GPU 服务器上
+export RETFOUND_CKPT_PATH=/data/weights/RETFound_mae_natureCFP.pth
+```
+
+设置了 `RETFOUND_CKPT_PATH` 后,`./run.sh` 会自动进入 RETFound 模式,**不再需要
+`HF_TOKEN`**(数据集仍从公开 HF 镜像下载,不受限)。
+
 ---
 
 ## 4. 环境依赖

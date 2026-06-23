@@ -136,7 +136,19 @@ def check_retfound_access(
     repo_id: str = RETFOUND_HF_REPO,
     filename: str = RETFOUND_CKPT_FILENAME,
 ) -> tuple[bool, str]:
-    """Return ``(ok, message_or_path)`` for gated RETFound checkpoint access."""
+    """Return ``(ok, message_or_path)`` for RETFound checkpoint access.
+
+    Resolution order:
+      1. ``RETFOUND_CKPT_PATH`` env var pointing to a local ``.pth`` (no HF needed).
+      2. ``hf_hub_download`` from the gated HF repo (requires token + accepted terms).
+    """
+
+    local = os.environ.get("RETFOUND_CKPT_PATH")
+    if local:
+        p = Path(local)
+        if p.is_file():
+            return True, str(p)
+        return False, f"RETFOUND_CKPT_PATH set but file not found: {local}"
 
     try:
         from huggingface_hub import hf_hub_download
