@@ -95,7 +95,13 @@ for seed in ${SEEDS}; do
 done
 
 # ---- 5. 运行矩阵 ------------------------------------------------------------
-if [[ "${RUN_RETFOUND}" == "1" ]]; then
+# PAPER_MATRIX_YAML overrides the auto-selected matrix (e.g. the medium config).
+if [[ -n "${PAPER_MATRIX_YAML:-}" ]]; then
+  MATRIX_YAML="${PAPER_MATRIX_YAML}"
+  STEM="$(basename "${MATRIX_YAML}" .yaml)"
+  OUT_DIR="${PAPER_OUT_DIR:-runs/paper_matrix/${STEM}}"
+  OUT_MD="${PAPER_OUT_MD:-docs/results/${STEM}.md}"
+elif [[ "${RUN_RETFOUND}" == "1" ]]; then
   MATRIX_YAML="configs/paper_matrix.yaml"
   OUT_DIR="runs/paper_matrix/retfound"
   OUT_MD="docs/results/paper_matrix_retfound.md"

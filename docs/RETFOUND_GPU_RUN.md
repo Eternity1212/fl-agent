@@ -120,6 +120,30 @@ export HF_TOKEN=hf_你的token   # 若已 source .env 可跳过
 
 ---
 
+## 6.5 先跑中等规模验证方向（推荐先做这一步）
+
+直接跑完整多 seed 矩阵很贵。建议先用中等规模配置（seed 0、多 epoch/round、
+注入标签噪声做鲁棒性对比）确认"抗噪鲁棒性 + LoRA 通信效率"这个方向真的有收益：
+
+```bash
+export HF_TOKEN=hf_你的token
+./scripts/run_paper_medium.sh    # 单 A100 约 1-1.5 小时
+```
+
+它会跑：
+
+- 干净 non-IID（Dirichlet α=0.5）下：Centralized / Local-only / FedAvg / FedProx / Robust-FedProx
+- 注入训练标签噪声 p=0.2 下：FedAvg / FedProx / Robust-FedProx
+
+看 `docs/results/paper_matrix_retfound_medium.md`：
+
+- **鲁棒性**：从 noise=0 到 noise=0.2，Robust-FedProx 的 best macro-F1 下降幅度
+  应明显小于 FedAvg/FedProx，才说明方向成立。
+- **通信效率**：联邦行的 `bytes`（只传 LoRA adapter）应远小于全模型，且性能接近
+  Centralized 上限。
+
+如果这一步看到正向信号，再扩成完整多 seed 主矩阵；否则需要先迭代方法。
+
 ## 7. 产物在哪
 
 - `docs/results/paper_matrix_retfound.md` — 可提交的结果表（含 method mean ± std）

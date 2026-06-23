@@ -1,0 +1,86 @@
+version: paper_matrix.v1
+
+# Medium-scale RETFound+LoRA matrix (seed 0) to verify the relative-advantage
+# story BEFORE committing to the full multi-seed matrix:
+#   - robustness: under injected train label noise, does Robust-FedProx degrade
+#     less than FedAvg / FedProx?
+#   - communication: LoRA adapter-only upload (total_upload_bytes) vs centralized.
+# Estimated wall time on one A100: ~1-1.5 hours.
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  test_labels_csv: data/raw/rfmid_full/test/labels.csv
+  test_images_dir: data/raw/rfmid_full/test/images
+  split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json
+
+defaults:
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 15
+  rounds: 30
+  local_epochs: 1
+  lr: 0.0001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.05
+  device: cuda
+  require_retfound: true
+
+runs:
+  # ---- context bounds (clean, non-IID Dirichlet a=0.5) --------------------
+  - name: med_centralized_clean
+    method: centralized
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+    train_label_noise: 0.0
+  - name: med_local_only_clean
+    method: local_only
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+    train_label_noise: 0.0
+
+  # ---- clean baselines vs ours -------------------------------------------
+  - name: med_fedavg_clean
+    method: fedavg
+    seed: 0
+    loss: bce
+    positive_dropout: 0.0
+    train_label_noise: 0.0
+  - name: med_fedprox_clean
+    method: fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+    train_label_noise: 0.0
+  - name: med_robust_fedprox_clean
+    method: robust_fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.1
+    train_label_noise: 0.0
+
+  # ---- robustness: inject train label noise p=0.2 ------------------------
+  - name: med_fedavg_noise02
+    method: fedavg
+    seed: 0
+    loss: bce
+    positive_dropout: 0.0
+    train_label_noise: 0.2
+  - name: med_fedprox_noise02
+    method: fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
+    train_label_noise: 0.2
+  - name: med_robust_fedprox_noise02
+    method: robust_fedprox
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.1
+    train_label_noise: 0.2

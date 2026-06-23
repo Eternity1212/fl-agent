@@ -55,6 +55,24 @@ def test_run_paper_experiment_centralized(tmp_path: Path) -> None:
     assert "best_macro_f1_present" in out["eval"]
 
 
+def test_train_label_noise_changes_training_labels(tmp_path: Path) -> None:
+    from fed_agent.data.rfmid_torch import RFMiDTorchDataset
+
+    labels, img_dir, _split = _fixture(tmp_path)
+    clean = RFMiDTorchDataset(labels_csv=labels, images_dir=img_dir, image_size=(8, 8))
+    noisy = RFMiDTorchDataset(
+        labels_csv=labels,
+        images_dir=img_dir,
+        image_size=(8, 8),
+        label_noise_p_flip=0.5,
+        label_noise_seed=0,
+    )
+    diffs = sum(
+        int(not torch.equal(clean[i][1], noisy[i][1])) for i in range(len(clean))
+    )
+    assert diffs > 0
+
+
 def test_run_paper_experiment_fedavg(tmp_path: Path) -> None:
     labels, img_dir, split_json = _fixture(tmp_path)
     cfg = PaperRunConfig(

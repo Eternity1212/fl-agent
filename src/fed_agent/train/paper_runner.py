@@ -34,6 +34,7 @@ class PaperRunConfig:
     fedprox_mu: float = 0.0
     loss: str = "bce"
     positive_dropout: float = 0.0
+    train_label_noise: float = 0.0
     image_size: tuple[int, int] = (224, 224)
     device: str = "cuda"
     lora_rank: int = 8
@@ -173,10 +174,13 @@ def _prepare(
     eval_images_dir: Path,
     cfg: PaperRunConfig,
 ) -> tuple[RFMiDTorchDataset, DataLoader, nn.Module, dict[str, Any], torch.Tensor | None]:
+    train_noise = float(cfg.train_label_noise)
     train_ds = RFMiDTorchDataset(
         labels_csv=train_labels_csv,
         images_dir=train_images_dir,
         image_size=cfg.image_size,
+        label_noise_p_flip=train_noise if train_noise > 0.0 else None,
+        label_noise_seed=int(cfg.seed),
     )
     eval_ds = RFMiDTorchDataset(
         labels_csv=eval_labels_csv,

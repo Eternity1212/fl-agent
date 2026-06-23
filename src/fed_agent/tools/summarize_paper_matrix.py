@@ -20,6 +20,7 @@ def _row(run: dict[str, Any]) -> dict[str, Any]:
         "backbone": cfg["backbone"],
         "loss": cfg["loss"],
         "positive_dropout": cfg["positive_dropout"],
+        "train_label_noise": cfg.get("train_label_noise", 0.0),
         "best_macro_f1_present": ev.get("best_macro_f1_present"),
         "best_micro_f1": ev.get("best_micro_f1"),
         "macro_ap": ev.get("macro_ap"),
@@ -33,13 +34,17 @@ def build_markdown(rows: list[dict[str, Any]]) -> str:
     lines = [
         "# Paper Matrix Summary",
         "",
-        "| run | method | loss | dropout | best macro-F1 | best micro-F1 | bytes | RETFound |",
-        "|-----|--------|------|---------|---------------|---------------|-------|----------|",
+        "| run | method | loss | dropout | noise | best macro-F1 | best micro-F1 | "
+        "macro-AUROC | bytes | RETFound |",
+        "|-----|--------|------|---------|-------|---------------|---------------|"
+        "-------------|-------|----------|",
     ]
     for r in rows:
         lines.append(
             f"| {r['name']} | {r['method']} | {r['loss']} | {r['positive_dropout']} | "
+            f"{r['train_label_noise']} | "
             f"{r['best_macro_f1_present']} | {r['best_micro_f1']} | "
+            f"{r['macro_auroc']} | "
             f"{r['total_upload_bytes']} | {r['is_retfound']} |",
         )
     by_method: dict[str, list[dict[str, Any]]] = {}
