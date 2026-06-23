@@ -118,8 +118,10 @@ def _set_classifier(model: nn.Module, n_labels: int) -> None:
 
 
 def _load_retfound_checkpoint(model: nn.Module, checkpoint_path: Path) -> None:
-    ckpt = torch.load(checkpoint_path, map_location="cpu")
-    state = ckpt.get("model", ckpt)
+    # weights_only=False: official RETFound checkpoints embed an argparse.Namespace,
+    # which the PyTorch 2.6+ safe loader rejects. Source is the trusted gated repo.
+    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    state = ckpt.get("model", ckpt) if isinstance(ckpt, dict) else ckpt
     model_state = model.state_dict()
     filtered = {
         k: v
