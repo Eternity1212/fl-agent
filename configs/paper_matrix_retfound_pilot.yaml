@@ -1,0 +1,31 @@
+version: paper_matrix.v1
+
+dataset:
+  train_labels_csv: data/raw/rfmid_pilot/train/head12_labels.csv
+  train_images_dir: data/raw/rfmid_pilot/train/images
+  validation_labels_csv: data/raw/rfmid_pilot/validation/head12_labels.csv
+  validation_images_dir: data/raw/rfmid_pilot/validation/images
+  test_labels_csv: data/raw/rfmid_pilot/validation/head12_labels.csv
+  test_images_dir: data/raw/rfmid_pilot/validation/images
+  split_json: configs/splits/generated/rfmid_pilot_head12_iid_K4_S0.json
+
+defaults:
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 4
+  epochs: 1
+  rounds: 1
+  local_epochs: 1
+  lr: 0.0001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.05
+  device: cpu
+  require_retfound: true
+
+runs:
+  - name: pilot_retfound_centralized_s0
+    method: centralized
+    seed: 0
+    loss: balanced_bce
+    positive_dropout: 0.0
