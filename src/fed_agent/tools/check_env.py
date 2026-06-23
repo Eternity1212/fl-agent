@@ -7,6 +7,7 @@ Face token, and gated RETFound checkpoint access, then prints a clear summary.
 from __future__ import annotations
 
 import argparse
+import os
 
 
 def _check_torch_gpu() -> tuple[bool, str]:
@@ -73,6 +74,11 @@ def main(argv: list[str] | None = None) -> int:
     ok_timm, msg_timm = _check_timm()
     checks.append(("timm", ok_timm, msg_timm))
     ok_token, msg_token = _check_token()
+    # A local checkpoint (RETFOUND_CKPT_PATH) removes the need for an HF token.
+    local_ckpt = os.environ.get("RETFOUND_CKPT_PATH")
+    if not ok_token and local_ckpt:
+        ok_token = True
+        msg_token = f"no HF token, but RETFOUND_CKPT_PATH set ({local_ckpt})"
     checks.append(("HF token", ok_token, msg_token))
 
     ok_retfound = True
