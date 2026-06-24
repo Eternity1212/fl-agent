@@ -1,0 +1,49 @@
+version: paper_matrix.v1
+
+# =============================================================================
+# FedProx μ=0.01 公平超参补跑
+# =============================================================================
+# 背景：主矩阵用 μ=0.05，在 LoRA（可训练参数极少）下疑似过度正则，导致 FedProx /
+# Robust-FedProx 干净指标系统性落后 FedAvg。本配置用更常规的 μ=0.01 重跑
+# FedProx / Robust-FedProx 的 seed 0/1/2，用于：
+#   - 若 μ=0.01 把干净指标拉回到 ~FedAvg 水平 -> 说明此前是超参问题，
+#     主对比应改用 μ=0.01（FedAvg 数字直接复用主矩阵 fedavg_s{0,1,2}，无需重跑）。
+#
+# 运行：
+#   PAPER_MATRIX_YAML=configs/paper_matrix_mu001.yaml ./run.sh
+# 断点续跑：已完成的 run 自动跳过。
+# =============================================================================
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  test_labels_csv: data/raw/rfmid_full/test/labels.csv
+  test_images_dir: data/raw/rfmid_full/test/images
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+defaults:
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 20
+  rounds: 40
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.01
+  device: cuda
+  require_retfound: true
+  loss: balanced_bce
+  positive_dropout: 0.0
+  train_label_noise: 0.0
+
+runs:
+  - { name: fedprox_mu001_s0,        method: fedprox,        seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: fedprox_mu001_s1,        method: fedprox,        seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: fedprox_mu001_s2,        method: fedprox,        seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: robust_mu001_s0,         method: robust_fedprox, seed: 0, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: robust_mu001_s1,         method: robust_fedprox, seed: 1, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: robust_mu001_s2,         method: robust_fedprox, seed: 2, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S2.json }
