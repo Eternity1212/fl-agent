@@ -30,6 +30,8 @@ defaults:
   agent_tau: 0.03
   agent_noisy_clients: [2, 3]
   agent_client_noise: 0.4
+  agent_mu_max: 0.1
+  agent_mu_tau: 0.05
 
 runs:
   - { name: het04_fedavg_s0, agent_aggregation: size,  seed: 0 }
@@ -38,3 +40,7 @@ runs:
   - { name: het04_agent_s0,  agent_aggregation: agent, seed: 0 }
   - { name: het04_agent_s1,  agent_aggregation: agent, seed: 1 }
   - { name: het04_agent_s2,  agent_aggregation: agent, seed: 2 }
+  # joint: adaptive aggregation weights + adaptive per-client mu
+  - { name: het04_agentmu_s0, agent_aggregation: agent, agent_adaptive_mu: true, seed: 0 }
+  - { name: het04_agentmu_s1, agent_aggregation: agent, agent_adaptive_mu: true, seed: 1 }
+  - { name: het04_agentmu_s2, agent_aggregation: agent, agent_adaptive_mu: true, seed: 2 }

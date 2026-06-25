@@ -105,6 +105,20 @@ runs:
   - { name: het04_dir_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
 
   # ----------------------------------------------------------------------------
+  # F. 联合自适应消融: per-client 自适应 mu (是否在"加权"之外还有增益)
+  #    本地 smoke 显示: 加权已隔离脏客户端时, mu 多为冗余; 但在"不能丢客户端"
+  #    的非IID+噪声场景下可能有用 -> 这里专门验证它。
+  #    - muonly: size 聚合 + 自适应 mu  (隔离 mu 单独贡献)
+  #    - agentmu: agent 加权 + 自适应 mu (联合)
+  # ----------------------------------------------------------------------------
+  - { name: het04_muonly_s0,  agent_aggregation: size,  agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_agentmu_s0, agent_aggregation: agent, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_agentmu_s1, agent_aggregation: agent, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_agentmu_s2, agent_aggregation: agent, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  # 非IID + 噪声: 不能简单丢客户端, 自适应 mu 最可能在这里体现价值
+  - { name: het04_dir_agentmu_s0, agent_aggregation: agent, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+
+  # ----------------------------------------------------------------------------
   # E. agent_tau 消融 (异质噪声@0.4, seed 0): 门控软硬程度
   # ----------------------------------------------------------------------------
   - { name: het04_agent_tau002_s0, agent_aggregation: agent, agent_client_noise: 0.4, agent_tau: 0.02, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }

@@ -51,6 +51,10 @@ class PaperRunConfig:
     agent_geometry: bool = False
     agent_noisy_clients: tuple[int, ...] = ()  # client ids that get label noise
     agent_client_noise: float = 0.0  # symmetric flip prob for noisy clients
+    # joint adaptive orchestration: per-client proximal strength from telemetry
+    agent_adaptive_mu: bool = False
+    agent_mu_max: float = 0.1
+    agent_mu_tau: float = 0.05
 
 
 class _InMemoryDataset(torch.utils.data.Dataset):
@@ -185,6 +189,7 @@ def _train_model(
     global_vec: torch.Tensor | None = None,
     round_seed: int = 0,
     label_flip_p: float = 0.0,
+    mu_override: float | None = None,
 ) -> float:
     device = _device_for(cfg)
     model.to(device)
@@ -192,6 +197,7 @@ def _train_model(
     pw = pos_weight.to(device) if pos_weight is not None else None
     loss_fn = _loss_fn(cfg, pw)
     opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=float(cfg.lr))
+    mu = float(mu_override) if mu_override is not None else float(cfg.fedprox_mu)
     losses: list[float] = []
     for _epoch in range(int(cfg.local_epochs)):
         for x, y, _meta in loader:
@@ -203,9 +209,9 @@ def _train_model(
             opt.zero_grad()
             logits = model(x)
             loss = loss_fn(logits, y)
-            if cfg.fedprox_mu > 0.0 and global_vec is not None:
+            if mu > 0.0 and global_vec is not None:
                 cur = torch.nn.utils.parameters_to_vector(list(model.parameters()))
-                loss = loss + 0.5 * float(cfg.fedprox_mu) * (cur - global_vec).pow(2).sum()
+                loss = loss + 0.5 * mu * (cur - global_vec).pow(2).sum()
             loss.backward()
             opt.step()
             losses.append(float(loss.detach().cpu().item()))
@@ -384,7 +390,7 @@ def _run_agent_federated(
     selective down-weighting can be evaluated against an equal/size-weighted
     FedAvg baseline under identical conditions.
     """
-    from fed_agent.agent.orchestrator import decide_weights
+    from fed_agent.agent.orchestrator import decide_client_mu, decide_weights
 
     split = read_split_json(split_json)
     clients: dict[str, list[str]] = split["clients"]
@@ -392,10 +398,14 @@ def _run_agent_federated(
     noisy = {int(c) for c in cfg.agent_noisy_clients}
     global_sd = _state_dict_cpu(model)
     dev = _device_for(cfg)
+    use_prox = (cfg.fedprox_mu > 0.0) or bool(cfg.agent_adaptive_mu)
+    need_scores = (cfg.agent_aggregation == "agent") or bool(cfg.agent_adaptive_mu)
     round_losses: list[float] = []
     upload_bytes: list[int] = []
     weight_history: list[dict[str, float]] = []
     probe_history: list[dict[str, float]] = []
+    mu_history: list[dict[str, float]] = []
+    prev_scores: dict[str, float] = {}
     for r in range(int(cfg.rounds)):
         local_sds = []
         sizes: list[float] = []
@@ -407,6 +417,16 @@ def _run_agent_federated(
             .clone()
             .to(dev)
         )
+        # Per-client proximal strength from the PREVIOUS round's probe scores.
+        cur_mu: dict[str, float] = {}
+        if cfg.agent_adaptive_mu and prev_scores:
+            ordered = [k for k in client_keys if k in prev_scores]
+            mus = decide_client_mu(
+                probe_scores=[prev_scores[k] for k in ordered],
+                mu_max=float(cfg.agent_mu_max),
+                tau=float(cfg.agent_mu_tau),
+            )
+            cur_mu = {k: m for k, m in zip(ordered, mus)}
         for ck in client_keys:
             idxs = train_ds.indices_for_ids(list(clients[ck]))
             if not idxs:
@@ -417,23 +437,26 @@ def _run_agent_federated(
                 subset, batch_size=int(cfg.batch_size), shuffle=True, **_loader_kwargs(cfg)
             )
             flip = float(cfg.agent_client_noise) if int(ck) in noisy else 0.0
+            mu_i = cur_mu.get(ck, 0.0)
             loss = _train_model(
                 model,
                 loader,
                 cfg=cfg,
                 pos_weight=pos_weight,
-                global_vec=global_vec if cfg.fedprox_mu > 0.0 else None,
+                global_vec=global_vec if use_prox else None,
                 round_seed=int(cfg.seed) + r * 1000 + int(ck),
                 label_flip_p=flip,
+                mu_override=mu_i if cfg.agent_adaptive_mu else None,
             )
             local_sds.append(_state_dict_cpu(model))
             sizes.append(float(len(idxs)))
             cks.append(ck)
             losses.append(loss)
+        mu_history.append({ck: float(cur_mu.get(ck, 0.0)) for ck in cks})
 
-        if cfg.agent_aggregation == "agent":
+        probe_scores: list[float] = []
+        if need_scores:
             scorer = probe_loader if probe_loader is not None else eval_loader
-            probe_scores = []
             for sd in local_sds:
                 _load_state_dict(model, sd)
                 y, p = _predict(model, scorer, device=cfg.device)
@@ -443,13 +466,16 @@ def _run_agent_federated(
                 pc = np.clip(p, eps, 1.0 - eps)
                 bce = float(-np.mean(y * np.log(pc) + (1.0 - y) * np.log(1.0 - pc)))
                 probe_scores.append(-bce)
+            probe_history.append({ck: float(s) for ck, s in zip(cks, probe_scores)})
+            prev_scores = {ck: float(s) for ck, s in zip(cks, probe_scores)}
+
+        if cfg.agent_aggregation == "agent":
             decision = decide_weights(
                 probe_scores=probe_scores,
                 sizes=sizes,
                 tau=float(cfg.agent_tau),
             )
             weights = decision.weights
-            probe_history.append({ck: float(s) for ck, s in zip(cks, probe_scores)})
         else:
             weights = list(sizes)
 
@@ -465,8 +491,10 @@ def _run_agent_federated(
         "total_upload_bytes": int(sum(upload_bytes)),
         "agent_weight_history": weight_history,
         "agent_probe_history": probe_history,
+        "agent_mu_history": mu_history,
         "agent_noisy_clients": sorted(noisy),
         "agent_probe_heldout": bool(probe_loader is not None),
+        "agent_adaptive_mu": bool(cfg.agent_adaptive_mu),
         "eval": _eval_payload(model, eval_loader, cfg=cfg),
     }
 

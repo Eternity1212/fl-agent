@@ -63,6 +63,31 @@ python3 -m fed_agent.tools.run_paper_matrix \
 - `agent_weight_history`:每轮各客户端权重 → 看是否压低脏客户端 2,3
 - `agent_probe_history`:每轮探针分 → 看干净/脏是否分层
 
+## 5b. 联合自适应:per-client 自适应 μ(可选第二杠杆)
+
+动机:μ 消融显示"固定正则强度"是 FedProx 失败主因。于是 agent 可再加一杆——
+用**上一轮**探针分给本轮每个客户端设 μ_i:
+
+```
+mu_i = mu_max * clamp((median_s - s_i) / mu_tau, 0, 1)
+```
+
+干净/均匀时 s_i≈median → μ_i≈0 → 退化为 FedAvg(正好避开 μ 消融的负结果);
+脏客户端 s_i 明显偏低 → μ_i 大 → 强拉回全局,限制其漂移。
+开关:`agent_adaptive_mu: true`(+ `agent_mu_max` / `agent_mu_tau`)。
+
+**本地 smoke 诚实结论(3 seed):**
+
+| 方法 | macro_auroc |
+|---|---|
+| fedavg | 0.5658±0.037 |
+| agent(仅加权) | **0.5877±0.044**(+0.022 WINS) |
+| agentmu(加权+自适应μ) | 0.5844±0.044(+0.019 WINS,但不及纯加权) |
+
+→ **加权已隔离脏客户端时,自适应 μ 基本冗余**(甚至略低,在噪声带内)。
+所以 μ **不作为主卖点**,而是作为 ablation 专门验证它在"不能丢客户端"的
+**非IID+噪声**场景(`het04_dir_agentmu`)是否有独立价值。主结论仍以"自适应加权"为主。
+
 ## 6. v0 caveat(已知,待修)
 
 当前 agent 探针用 **validation 集**打分,final 也在 validation 上报告,agent 对 val 有"偷看"。

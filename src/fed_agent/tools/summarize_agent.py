@@ -23,7 +23,7 @@ def _variant(name: str, cfg: dict[str, Any]) -> tuple[str, str]:
     base = name.rsplit("_s", 1)[0]  # strip trailing _s<seed>
     parts = base.split("_")
     # method is the token among known set; condition is the rest
-    known = {"fedavg", "robust", "agent"}
+    known = {"fedavg", "robust", "agent", "agentmu"}
     method = next((p for p in parts if p in known), "?")
     cond = "_".join(p for p in parts if p not in known)
     # disambiguate tau ablations carried in the leftover (e.g. het04_tau002)
@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         print(header)
         print("-" * len(header))
         fed_auroc = None
-        for method in ["fedavg", "robust", "agent"]:
+        for method in ["fedavg", "robust", "agent", "agentmu"]:
             b = buckets.get((cond, method))
             if not b:
                 continue
@@ -80,16 +80,17 @@ def main(argv: list[str] | None = None) -> int:
             print(row)
             if method == "fedavg" and b["macro_auroc"]:
                 fed_auroc = mean(b["macro_auroc"])
-        ab = buckets.get((cond, "agent"))
-        if ab and ab["macro_auroc"] and fed_auroc is not None:
-            delta = mean(ab["macro_auroc"]) - fed_auroc
-            if delta > 0.005:
-                verdict = "AGENT WINS"
-            elif delta >= -0.005:
-                verdict = "~tie"
-            else:
-                verdict = "agent loses"
-            print(f">>> agent-fedavg macro_auroc delta = {delta:+.4f}  [{verdict}]")
+        for variant in ["agent", "agentmu"]:
+            ab = buckets.get((cond, variant))
+            if ab and ab["macro_auroc"] and fed_auroc is not None:
+                delta = mean(ab["macro_auroc"]) - fed_auroc
+                if delta > 0.005:
+                    verdict = "WINS"
+                elif delta >= -0.005:
+                    verdict = "~tie"
+                else:
+                    verdict = "loses"
+                print(f">>> {variant}-fedavg macro_auroc delta = {delta:+.4f}  [{verdict}]")
         print()
     return 0
 

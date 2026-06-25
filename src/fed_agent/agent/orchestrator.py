@@ -63,6 +63,39 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / (na * nb)
 
 
+def decide_client_mu(
+    *,
+    probe_scores: list[float],
+    mu_max: float,
+    tau: float,
+) -> list[float]:
+    """Per-client proximal strength from telemetry (joint adaptive orchestration).
+
+    Motivated by the empirical finding that a *fixed* FedProx mu is the failure
+    mode (small mu ~ FedAvg, large mu collapses). Here mu is set per client and
+    per round from the previous round's probe scores:
+
+        mu_i = mu_max * clamp((median_s - s_i) / tau, 0, 1)
+
+    A client at or above the pack (s_i >= median) gets mu_i = 0 -> trains freely
+    (clean case reduces to FedAvg, which is best). A client clearly below the
+    pack (noisy) gets a strong proximal pull toward the global model, limiting
+    how far its corrupted update can drift.
+    """
+    n = len(probe_scores)
+    if n == 0:
+        return []
+    if tau <= 0:
+        return [0.0] * n
+    center = _median(probe_scores)
+    out = []
+    for s in probe_scores:
+        frac = (center - s) / tau
+        frac = max(0.0, min(1.0, frac))
+        out.append(float(mu_max) * frac)
+    return out
+
+
 def decide_weights(
     *,
     probe_scores: list[float],
