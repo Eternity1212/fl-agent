@@ -40,6 +40,12 @@ class PaperRunConfig:
     lora_rank: int = 8
     lora_alpha: float = 16.0
     require_retfound: bool = False
+    # --- agent (adaptive orchestration) options ---
+    agent_aggregation: str = "agent"  # "agent" | "size" (size = FedAvg baseline)
+    agent_tau: float = 0.05
+    agent_geometry: bool = False
+    agent_noisy_clients: tuple[int, ...] = ()  # client ids that get label noise
+    agent_client_noise: float = 0.0  # symmetric flip prob for noisy clients
 
 
 class _InMemoryDataset(torch.utils.data.Dataset):
@@ -107,6 +113,18 @@ def _apply_positive_dropout(y: torch.Tensor, *, p: float, seed: int) -> torch.Te
     return out
 
 
+def _apply_symmetric_flip(y: torch.Tensor, *, p: float, seed: int) -> torch.Tensor:
+    """Flip binary labels 0<->1 with probability p (symmetric label noise)."""
+    if p <= 0.0:
+        return y
+    g = torch.Generator(device=y.device)
+    g.manual_seed(int(seed))
+    flip = torch.rand(y.shape, generator=g, device=y.device) < float(p)
+    out = y.clone()
+    out[flip] = 1.0 - out[flip]
+    return out
+
+
 def _loss_fn(cfg: PaperRunConfig, pos_weight: torch.Tensor | None) -> nn.Module:
     if cfg.loss == "balanced_bce":
         return nn.BCEWithLogitsLoss(pos_weight=pos_weight)
@@ -123,6 +141,7 @@ def _train_model(
     pos_weight: torch.Tensor | None,
     global_vec: torch.Tensor | None = None,
     round_seed: int = 0,
+    label_flip_p: float = 0.0,
 ) -> float:
     device = torch.device(cfg.device if torch.cuda.is_available() or cfg.device == "cpu" else "cpu")
     model.to(device)
@@ -135,6 +154,8 @@ def _train_model(
         for x, y, _meta in loader:
             x = x.to(device)
             y = y.to(device)
+            if label_flip_p > 0.0:
+                y = _apply_symmetric_flip(y, p=float(label_flip_p), seed=int(round_seed))
             y = _apply_positive_dropout(y, p=float(cfg.positive_dropout), seed=int(round_seed))
             opt.zero_grad()
             logits = model(x)
@@ -234,7 +255,7 @@ def _run_federated(
     split = read_split_json(split_json)
     clients: dict[str, list[str]] = split["clients"]
     client_keys = sorted(clients.keys(), key=lambda x: int(x))
-    global_sd = OrderedDict({k: v.detach().cpu() for k, v in model.state_dict().items()})
+    global_sd = OrderedDict({k: v.detach().cpu().clone() for k, v in model.state_dict().items()})
     round_losses: list[float] = []
     upload_bytes: list[int] = []
     for r in range(int(cfg.rounds)):
@@ -258,7 +279,7 @@ def _run_federated(
                 round_seed=int(cfg.seed) + r * 1000 + int(ck),
             )
             local_sds.append(
-                OrderedDict({k: v.detach().cpu() for k, v in model.state_dict().items()}),
+                OrderedDict({k: v.detach().cpu().clone() for k, v in model.state_dict().items()}),
             )
             weights.append(float(len(idxs)))
             losses.append(loss)
@@ -270,6 +291,100 @@ def _run_federated(
         "train_loss": round_losses,
         "comm_bytes_upload_per_round": upload_bytes,
         "total_upload_bytes": int(sum(upload_bytes)),
+        "eval": _eval_payload(model, eval_loader, cfg=cfg),
+    }
+
+
+def _run_agent_federated(
+    *,
+    train_ds: RFMiDTorchDataset,
+    eval_loader: DataLoader,
+    model: nn.Module,
+    split_json: Path,
+    cfg: PaperRunConfig,
+    pos_weight: torch.Tensor | None,
+) -> dict[str, Any]:
+    """Federated training with adaptive (agent) or size-based aggregation.
+
+    Supports per-client label noise (``agent_noisy_clients``) so that the agent's
+    selective down-weighting can be evaluated against an equal/size-weighted
+    FedAvg baseline under identical conditions.
+    """
+    from fed_agent.agent.orchestrator import decide_weights
+
+    split = read_split_json(split_json)
+    clients: dict[str, list[str]] = split["clients"]
+    client_keys = sorted(clients.keys(), key=lambda x: int(x))
+    noisy = {int(c) for c in cfg.agent_noisy_clients}
+    global_sd = OrderedDict({k: v.detach().cpu().clone() for k, v in model.state_dict().items()})
+    round_losses: list[float] = []
+    upload_bytes: list[int] = []
+    weight_history: list[dict[str, float]] = []
+    probe_history: list[dict[str, float]] = []
+    for r in range(int(cfg.rounds)):
+        local_sds = []
+        sizes: list[float] = []
+        cks: list[str] = []
+        losses = []
+        global_vec = torch.nn.utils.parameters_to_vector(list(model.parameters())).detach().clone()
+        for ck in client_keys:
+            idxs = train_ds.indices_for_ids(list(clients[ck]))
+            if not idxs:
+                continue
+            model.load_state_dict(global_sd)
+            subset = Subset(train_ds, idxs)
+            loader = DataLoader(subset, batch_size=int(cfg.batch_size), shuffle=True)
+            flip = float(cfg.agent_client_noise) if int(ck) in noisy else 0.0
+            loss = _train_model(
+                model,
+                loader,
+                cfg=cfg,
+                pos_weight=pos_weight,
+                global_vec=global_vec if cfg.fedprox_mu > 0.0 else None,
+                round_seed=int(cfg.seed) + r * 1000 + int(ck),
+                label_flip_p=flip,
+            )
+            local_sds.append(
+                OrderedDict({k: v.detach().cpu().clone() for k, v in model.state_dict().items()}),
+            )
+            sizes.append(float(len(idxs)))
+            cks.append(ck)
+            losses.append(loss)
+
+        if cfg.agent_aggregation == "agent":
+            probe_scores = []
+            for sd in local_sds:
+                model.load_state_dict(sd)
+                y, p = _predict(model, eval_loader, device=cfg.device)
+                # Negative validation BCE: more sensitive to label-noise damage
+                # than AUROC, so clean clients score clearly higher than noisy.
+                eps = 1e-7
+                pc = np.clip(p, eps, 1.0 - eps)
+                bce = float(-np.mean(y * np.log(pc) + (1.0 - y) * np.log(1.0 - pc)))
+                probe_scores.append(-bce)
+            decision = decide_weights(
+                probe_scores=probe_scores,
+                sizes=sizes,
+                tau=float(cfg.agent_tau),
+            )
+            weights = decision.weights
+            probe_history.append({ck: float(s) for ck, s in zip(cks, probe_scores)})
+        else:
+            weights = list(sizes)
+
+        weight_history.append({ck: float(w) for ck, w in zip(cks, weights)})
+        global_sd = fedavg_state_dict(local_sds, weights)
+        model.load_state_dict(global_sd)
+        round_losses.append(float(sum(losses) / max(len(losses), 1)))
+        upload_bytes.append(_trainable_nbytes(model) * len(local_sds))
+
+    return {
+        "train_loss": round_losses,
+        "comm_bytes_upload_per_round": upload_bytes,
+        "total_upload_bytes": int(sum(upload_bytes)),
+        "agent_weight_history": weight_history,
+        "agent_probe_history": probe_history,
+        "agent_noisy_clients": sorted(noisy),
         "eval": _eval_payload(model, eval_loader, cfg=cfg),
     }
 
@@ -347,6 +462,17 @@ def run_paper_experiment(
         if split_json is None:
             raise ValueError(f"{cfg.method} requires split_json")
         result = _run_federated(
+            train_ds=train_ds,
+            eval_loader=eval_loader,
+            model=model,
+            split_json=split_json,
+            cfg=cfg,
+            pos_weight=pos_weight,
+        )
+    elif cfg.method == "agent_fed":
+        if split_json is None:
+            raise ValueError("agent_fed requires split_json")
+        result = _run_agent_federated(
             train_ds=train_ds,
             eval_loader=eval_loader,
             model=model,

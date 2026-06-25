@@ -1,0 +1,34 @@
+version: paper_matrix.v1
+
+# Tiny LOCAL smoke for the agent matrix pipeline (CPU, TinyCNN, subset).
+# Verifies YAML -> run_paper_matrix -> agent_fed end-to-end. Not for paper numbers.
+#   python3 -m fed_agent.tools.run_paper_matrix \
+#     --matrix_yaml configs/paper_matrix_agent_smoke.yaml \
+#     --out_dir runs/paper_matrix/agent_smoke
+
+dataset:
+  train_labels_csv: data/raw/rfmid_sub/train/head12_labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_sub/validation/head12_labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  split_json: configs/splits/generated/rfmid_sub_head12_iid_K4_S0.json
+
+defaults:
+  method: agent_fed
+  backbone: tiny_cnn
+  image_size: [64, 64]
+  batch_size: 16
+  rounds: 6
+  local_epochs: 2
+  lr: 0.001
+  device: cpu
+  require_retfound: false
+  loss: balanced_bce
+  agent_aggregation: agent
+  agent_tau: 0.03
+  agent_noisy_clients: [2, 3]
+  agent_client_noise: 0.4
+
+runs:
+  - { name: smoke_fedavg_s0, agent_aggregation: size,  seed: 0 }
+  - { name: smoke_agent_s0,  agent_aggregation: agent, seed: 0 }

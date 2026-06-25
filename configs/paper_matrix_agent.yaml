@@ -1,0 +1,102 @@
+version: paper_matrix.v1
+
+# =============================================================================
+# Agent (Adaptive Orchestration) 决定性实验矩阵 (GPU / A100)
+# =============================================================================
+# 核心假设:
+#   静态方法 (FedAvg / Robust-FedProx) 在"异质噪声"(部分客户端脏、部分干净)下
+#   无法分辨谁脏谁干净;agent 通过每轮探针打分动态识别并压低脏客户端,因此应当:
+#     1) clean 时退化成 FedAvg (不掉点)
+#     2) 异质噪声 / 异质 non-IID 下优于 FedAvg 和 Robust-FedProx
+#
+# 公平性: 所有方法在"同一份异质噪声"下比较。异质噪声通过 agent_fed runner 的
+#   per-client 注入实现 (agent_noisy_clients=[2,3]):
+#     - FedAvg 基线  : method=agent_fed, agent_aggregation=size, mu=0,    dropout=0
+#     - Robust 基线  : method=agent_fed, agent_aggregation=size, mu=0.05, dropout=0.1
+#     - Agent       : method=agent_fed, agent_aggregation=agent
+#
+# 注意 (v0 caveat): 当前 agent 探针使用 validation 集打分,final 也在 validation 上
+#   报告,agent 因此对 val 有"偷看"。这是 v0 快速验证版;若 agent 显示收益,再用
+#   held-out probe 重跑 final 数字确认 (见 docs/AGENT_EXPERIMENTS.md)。
+#
+# 运行 (GPU, clone 后已 export HF_TOKEN 或设 RETFOUND_CKPT_PATH):
+#   python3 -m fed_agent.tools.run_paper_matrix \
+#     --matrix_yaml configs/paper_matrix_agent.yaml \
+#     --out_dir runs/paper_matrix/agent
+#
+# 断点续跑: 每个 run 单独存盘,中断重跑自动跳过已完成 run。
+# =============================================================================
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  test_labels_csv: data/raw/rfmid_full/test/labels.csv
+  test_images_dir: data/raw/rfmid_full/test/images
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+defaults:
+  method: agent_fed
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 20
+  rounds: 40
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.0
+  device: cuda
+  require_retfound: true
+  loss: balanced_bce
+  positive_dropout: 0.0
+  train_label_noise: 0.0
+  # agent-specific
+  agent_aggregation: agent
+  agent_tau: 0.03
+  agent_noisy_clients: [2, 3]
+  agent_client_noise: 0.0
+
+runs:
+  # ----------------------------------------------------------------------------
+  # A. CLEAN 控制组 (agent_client_noise=0): 验证 agent 干净时 ≈ FedAvg, 不掉点
+  # ----------------------------------------------------------------------------
+  - { name: clean_fedavg_s0, agent_aggregation: size,  seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: clean_agent_s0,  agent_aggregation: agent, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+
+  # ----------------------------------------------------------------------------
+  # B. 异质噪声 @ 0.4 (客户端 2,3 脏), 3 seeds x 3 方法 = 决定性对比
+  # ----------------------------------------------------------------------------
+  # --- FedAvg 基线 (等权/size) ---
+  - { name: het04_fedavg_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_fedavg_s1, agent_aggregation: size,  agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_fedavg_s2, agent_aggregation: size,  agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  # --- Robust-FedProx 基线 (size + mu + positive_dropout) ---
+  - { name: het04_robust_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_robust_s1, agent_aggregation: size,  agent_client_noise: 0.4, seed: 1, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_robust_s2, agent_aggregation: size,  agent_client_noise: 0.4, seed: 2, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  # --- Agent (自适应加权) ---
+  - { name: het04_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_agent_s1,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_agent_s2,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+
+  # ----------------------------------------------------------------------------
+  # C. 异质噪声 @ 0.2 (更温和), seed 0, 3 方法
+  # ----------------------------------------------------------------------------
+  - { name: het02_fedavg_s0, agent_aggregation: size,  agent_client_noise: 0.2, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het02_robust_s0, agent_aggregation: size,  agent_client_noise: 0.2, seed: 0, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het02_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.2, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+
+  # ----------------------------------------------------------------------------
+  # D. 异质噪声 + 非IID (Dirichlet a=0.1), seed 0, agent vs fedavg
+  # ----------------------------------------------------------------------------
+  - { name: het04_dir_fedavg_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+
+  # ----------------------------------------------------------------------------
+  # E. agent_tau 消融 (异质噪声@0.4, seed 0): 门控软硬程度
+  # ----------------------------------------------------------------------------
+  - { name: het04_agent_tau002_s0, agent_aggregation: agent, agent_client_noise: 0.4, agent_tau: 0.02, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_agent_tau005_s0, agent_aggregation: agent, agent_client_noise: 0.4, agent_tau: 0.05, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
