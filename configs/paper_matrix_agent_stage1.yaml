@@ -1,0 +1,81 @@
+version: paper_matrix.v1
+
+# =============================================================================
+# Agent Stage-1: 决定性 go/no-go 对比 (GPU / A100)  —— 先跑这个 (~2-3h 多卡)
+# =============================================================================
+# 目的: 用最少的 run 回答唯一关键问题——
+#   "自适应编排 agent 在真模型 (RETFound+LoRA) 上、异质噪声下,是否 3 seed 一致
+#    优于 FedAvg 和 Robust-FedProx?"
+# 只要这里 agent 一致 WINS, 方法创新即坐实, 再跑 configs/paper_matrix_agent.yaml
+# 的全量 (clean 控制 / 噪声@0.2 / tau 消融 / μ 消融)。
+#
+# 公平性: 三方在"同一份异质噪声"(agent_noisy_clients=[2,3]) 下比较:
+#   - FedAvg : agent_aggregation=size,  mu=0,    dropout=0
+#   - Robust : agent_aggregation=size,  mu=0.05, dropout=0.1
+#   - Agent  : agent_aggregation=agent
+#
+# 无泄漏: agent 用 PROBE(validation) 选权重, final 指标在 TEST 上报告。
+#
+# 运行 (GPU, 已 export HF_TOKEN 或设 RETFOUND_CKPT_PATH):
+#   ./run_agent.sh stage1
+#   # 或: python3 -m fed_agent.tools.run_paper_matrix \
+#   #       --matrix_yaml configs/paper_matrix_agent_stage1.yaml \
+#   #       --out_dir runs/paper_matrix/agent_stage1
+#
+# 断点续跑: 每个 run 单独存盘, 中断重跑自动跳过已完成 run。
+# =============================================================================
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  # No-leakage: agent picks weights on PROBE (validation); final on TEST.
+  eval_labels_csv: data/raw/rfmid_full/test/labels.csv
+  eval_images_dir: data/raw/rfmid_full/test/images
+  probe_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  probe_images_dir: data/raw/rfmid_full/validation/images
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+defaults:
+  method: agent_fed
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 20
+  rounds: 40
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.0
+  device: cuda
+  require_retfound: true
+  loss: balanced_bce
+  positive_dropout: 0.0
+  train_label_noise: 0.0
+  # throughput / multi-GPU (auto-falls back to 1 GPU if only one visible)
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  use_data_parallel: true
+  # agent-specific
+  agent_aggregation: agent
+  agent_tau: 0.03
+  agent_noisy_clients: [2, 3]
+  agent_client_noise: 0.4
+
+runs:
+  # --- 异质噪声 @0.4, IID, 三方 × 3 seed (决定性) ---
+  - { name: het04_fedavg_s0, agent_aggregation: size,  seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_fedavg_s1, agent_aggregation: size,  seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_fedavg_s2, agent_aggregation: size,  seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04_robust_s0, agent_aggregation: size,  seed: 0, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_robust_s1, agent_aggregation: size,  seed: 1, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_robust_s2, agent_aggregation: size,  seed: 2, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04_agent_s0,  agent_aggregation: agent, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_agent_s1,  agent_aggregation: agent, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_agent_s2,  agent_aggregation: agent, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  # --- 异质噪声 @0.4 + 非IID (Dirichlet a=0.1), agent vs fedavg (决定性) ---
+  - { name: het04_dir_fedavg_s0, agent_aggregation: size,  seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_agent_s0,  agent_aggregation: agent, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
