@@ -218,6 +218,23 @@ def _prepare(
     return train_ds, eval_loader, model, info, pw
 
 
+def _build_eval_loader(
+    labels_csv: Path,
+    images_dir: Path,
+    *,
+    cfg: PaperRunConfig,
+) -> DataLoader:
+    """Build a non-shuffled loader (for probe / eval) matching _prepare semantics."""
+    ds: Any = RFMiDTorchDataset(
+        labels_csv=labels_csv,
+        images_dir=images_dir,
+        image_size=cfg.image_size,
+    )
+    if max(cfg.image_size) <= 64:
+        ds = _InMemoryDataset(ds)
+    return DataLoader(ds, batch_size=int(cfg.batch_size), shuffle=False)
+
+
 def _eval_payload(
     model: nn.Module,
     eval_loader: DataLoader,
@@ -303,6 +320,7 @@ def _run_agent_federated(
     split_json: Path,
     cfg: PaperRunConfig,
     pos_weight: torch.Tensor | None,
+    probe_loader: DataLoader | None = None,
 ) -> dict[str, Any]:
     """Federated training with adaptive (agent) or size-based aggregation.
 
@@ -352,10 +370,11 @@ def _run_agent_federated(
             losses.append(loss)
 
         if cfg.agent_aggregation == "agent":
+            scorer = probe_loader if probe_loader is not None else eval_loader
             probe_scores = []
             for sd in local_sds:
                 model.load_state_dict(sd)
-                y, p = _predict(model, eval_loader, device=cfg.device)
+                y, p = _predict(model, scorer, device=cfg.device)
                 # Negative validation BCE: more sensitive to label-noise damage
                 # than AUROC, so clean clients score clearly higher than noisy.
                 eps = 1e-7
@@ -385,6 +404,7 @@ def _run_agent_federated(
         "agent_weight_history": weight_history,
         "agent_probe_history": probe_history,
         "agent_noisy_clients": sorted(noisy),
+        "agent_probe_heldout": bool(probe_loader is not None),
         "eval": _eval_payload(model, eval_loader, cfg=cfg),
     }
 
@@ -425,6 +445,8 @@ def run_paper_experiment(
     eval_images_dir: Path,
     cfg: PaperRunConfig,
     split_json: Path | None = None,
+    probe_labels_csv: Path | None = None,
+    probe_images_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Run one centralized/local/federated paper experiment."""
 
@@ -436,6 +458,9 @@ def run_paper_experiment(
         eval_images_dir=eval_images_dir,
         cfg=cfg,
     )
+    probe_loader = None
+    if probe_labels_csv is not None and probe_images_dir is not None:
+        probe_loader = _build_eval_loader(probe_labels_csv, probe_images_dir, cfg=cfg)
     x0, y0, _m = train_ds[0]
     if cfg.method == "centralized":
         result = _run_centralized(
@@ -475,6 +500,7 @@ def run_paper_experiment(
         result = _run_agent_federated(
             train_ds=train_ds,
             eval_loader=eval_loader,
+            probe_loader=probe_loader,
             model=model,
             split_json=split_json,
             cfg=cfg,

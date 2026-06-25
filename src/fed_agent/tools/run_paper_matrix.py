@@ -60,13 +60,21 @@ def run_matrix(
         cfg = _cfg_from_row(defaults, row)
         split_json_value = row.get("split_json", dataset.get("split_json"))
         split_json = Path(split_json_value) if cfg.method != "centralized" else None
+        # Final eval: explicit eval_* overrides validation_* (e.g. report on test).
+        eval_labels = dataset.get("eval_labels_csv", dataset["validation_labels_csv"])
+        eval_images = dataset.get("eval_images_dir", dataset["validation_images_dir"])
+        # Probe (agent-only): held-out set for per-client scoring; None -> uses eval.
+        probe_labels = dataset.get("probe_labels_csv")
+        probe_images = dataset.get("probe_images_dir")
         result = run_paper_experiment(
             train_labels_csv=Path(dataset["train_labels_csv"]),
             train_images_dir=Path(dataset["train_images_dir"]),
-            eval_labels_csv=Path(dataset["validation_labels_csv"]),
-            eval_images_dir=Path(dataset["validation_images_dir"]),
+            eval_labels_csv=Path(eval_labels),
+            eval_images_dir=Path(eval_images),
             cfg=cfg,
             split_json=split_json,
+            probe_labels_csv=Path(probe_labels) if probe_labels else None,
+            probe_images_dir=Path(probe_images) if probe_images else None,
         )
         payload = {"name": name, "config": asdict(cfg), "result": result}
         runs_out.append(payload)

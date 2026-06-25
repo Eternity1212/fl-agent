@@ -11,6 +11,9 @@ dataset:
   train_images_dir: data/raw/rfmid_full/train/images
   validation_labels_csv: data/raw/rfmid_sub/validation/head12_labels.csv
   validation_images_dir: data/raw/rfmid_full/validation/images
+  # subset has no test split; probe==eval here (leak ok, this is only a pipeline smoke)
+  probe_labels_csv: data/raw/rfmid_sub/validation/head12_labels.csv
+  probe_images_dir: data/raw/rfmid_full/validation/images
   split_json: configs/splits/generated/rfmid_sub_head12_iid_K4_S0.json
 
 defaults:

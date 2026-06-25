@@ -32,8 +32,12 @@ dataset:
   train_images_dir: data/raw/rfmid_full/train/images
   validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
   validation_images_dir: data/raw/rfmid_full/validation/images
-  test_labels_csv: data/raw/rfmid_full/test/labels.csv
-  test_images_dir: data/raw/rfmid_full/test/images
+  # No-leakage setup: agent picks weights using the PROBE (validation) set, while
+  # final metrics are reported on the TEST set, which the agent never sees.
+  eval_labels_csv: data/raw/rfmid_full/test/labels.csv
+  eval_images_dir: data/raw/rfmid_full/test/images
+  probe_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  probe_images_dir: data/raw/rfmid_full/validation/images
   split_json: configs/splits/generated/labels__iid_K4_S0.json
 
 defaults:
