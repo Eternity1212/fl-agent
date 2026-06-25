@@ -1,0 +1,99 @@
+{
+  "name": "centralized_s1",
+  "config": {
+    "method": "centralized",
+    "backbone": "retfound_mae_vit_large",
+    "seed": 1,
+    "epochs": 20,
+    "rounds": 40,
+    "local_epochs": 1,
+    "batch_size": 16,
+    "lr": 0.001,
+    "fedprox_mu": 0.05,
+    "loss": "balanced_bce",
+    "positive_dropout": 0.0,
+    "train_label_noise": 0.0,
+    "image_size": [
+      224,
+      224
+    ],
+    "device": "cuda",
+    "lora_rank": 8,
+    "lora_alpha": 16.0,
+    "require_retfound": true,
+    "num_workers": 8,
+    "pin_memory": true,
+    "persistent_workers": true,
+    "use_data_parallel": true
+  },
+  "result": {
+    "config": {
+      "method": "centralized",
+      "backbone": "retfound_mae_vit_large",
+      "seed": 1,
+      "epochs": 20,
+      "rounds": 40,
+      "local_epochs": 1,
+      "batch_size": 16,
+      "lr": 0.001,
+      "fedprox_mu": 0.05,
+      "loss": "balanced_bce",
+      "positive_dropout": 0.0,
+      "train_label_noise": 0.0,
+      "image_size": [
+        224,
+        224
+      ],
+      "device": "cuda",
+      "lora_rank": 8,
+      "lora_alpha": 16.0,
+      "require_retfound": true,
+      "num_workers": 8,
+      "pin_memory": true,
+      "persistent_workers": true,
+      "use_data_parallel": true
+    },
+    "model_info": {
+      "requested_backbone": "retfound_mae_vit_large",
+      "actual_backbone": "retfound_mae_vit_large",
+      "is_retfound": true,
+      "checkpoint_path": "/home/tiger/.cache/huggingface/hub/models--YukunZhou--RETFound_mae_natureCFP/snapshots/556830f78214f0e8da35af965292ac5a3180ac47/RETFound_mae_natureCFP.pth",
+      "lora_rank": 8,
+      "lora_alpha": 16.0,
+      "trainable_params": 1226798,
+      "total_params": 304528430
+    },
+    "train_loss": [
+      0.5120409918328126,
+      0.42850281670689583,
+      0.3875524995227655,
+      0.346825181444486,
+      0.30928931571543217,
+      0.27043655117352805,
+      0.24666785107304653,
+      0.21316648808618385,
+      0.18776419963687657,
+      0.15872693074246247,
+      0.1340654155239463,
+      0.11594206461062034,
+      0.10128663890063763,
+      0.09253206960856915,
+      0.09271253648524483,
+      0.08580058791364233,
+      0.07889418052509427,
+      0.06941653732210398,
+      0.0582311300560832,
+      0.056393195890511075
+    ],
+    "eval": {
+      "threshold": 0.5,
+      "micro_f1": 0.6633522727272727,
+      "macro_f1_present": 0.24577349095346612,
+      "best_threshold": 0.5,
+      "best_micro_f1": 0.6633522727272727,
+      "best_macro_f1_present": 0.24577349095346612,
+      "macro_ap": 0.27642807579479517,
+      "macro_auroc": 0.8158955187686436
+    }
+  }
+}
