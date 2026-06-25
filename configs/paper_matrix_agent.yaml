@@ -57,6 +57,11 @@ defaults:
   loss: balanced_bce
   positive_dropout: 0.0
   train_label_noise: 0.0
+  # throughput / multi-GPU (auto-falls back to 1 GPU if only one is visible)
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  use_data_parallel: true
   # agent-specific
   agent_aggregation: agent
   agent_tau: 0.03

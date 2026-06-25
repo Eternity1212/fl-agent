@@ -40,6 +40,11 @@ class PaperRunConfig:
     lora_rank: int = 8
     lora_alpha: float = 16.0
     require_retfound: bool = False
+    # --- throughput / multi-GPU options ---
+    num_workers: int = 0
+    pin_memory: bool = True
+    persistent_workers: bool = False
+    use_data_parallel: bool = False
     # --- agent (adaptive orchestration) options ---
     agent_aggregation: str = "agent"  # "agent" | "size" (size = FedAvg baseline)
     agent_tau: float = 0.05
@@ -133,6 +138,44 @@ def _loss_fn(cfg: PaperRunConfig, pos_weight: torch.Tensor | None) -> nn.Module:
     raise ValueError(f"Unknown loss: {cfg.loss}")
 
 
+def _device_for(cfg: PaperRunConfig) -> torch.device:
+    return torch.device(cfg.device if torch.cuda.is_available() or cfg.device == "cpu" else "cpu")
+
+
+def _loader_kwargs(cfg: PaperRunConfig) -> dict[str, Any]:
+    num_workers = max(int(cfg.num_workers), 0)
+    pin_memory = bool(cfg.pin_memory) and _device_for(cfg).type == "cuda"
+    kwargs: dict[str, Any] = {"num_workers": num_workers, "pin_memory": pin_memory}
+    if num_workers > 0:
+        kwargs["persistent_workers"] = bool(cfg.persistent_workers)
+    return kwargs
+
+
+def _unwrap_model(model: nn.Module) -> nn.Module:
+    return model.module if isinstance(model, nn.DataParallel) else model
+
+
+def _maybe_wrap_data_parallel(model: nn.Module, cfg: PaperRunConfig) -> nn.Module:
+    dev = _device_for(cfg)
+    if dev.type != "cuda" or not bool(cfg.use_data_parallel):
+        return model
+    if torch.cuda.device_count() < 2:
+        return model
+    return nn.DataParallel(model)
+
+
+def _state_dict_cpu(model: nn.Module) -> OrderedDict[str, torch.Tensor]:
+    """CPU snapshot of the (unwrapped) model params. ``.clone()`` is required for
+    correctness on CPU, where ``.cpu()`` is a no-op that would otherwise alias
+    live parameters; it is a harmless extra copy on CUDA."""
+    base = _unwrap_model(model)
+    return OrderedDict({k: v.detach().cpu().clone() for k, v in base.state_dict().items()})
+
+
+def _load_state_dict(model: nn.Module, state_dict: OrderedDict[str, torch.Tensor]) -> None:
+    _unwrap_model(model).load_state_dict(state_dict)
+
+
 def _train_model(
     model: nn.Module,
     loader: DataLoader,
@@ -143,7 +186,7 @@ def _train_model(
     round_seed: int = 0,
     label_flip_p: float = 0.0,
 ) -> float:
-    device = torch.device(cfg.device if torch.cuda.is_available() or cfg.device == "cpu" else "cpu")
+    device = _device_for(cfg)
     model.to(device)
     model.train()
     pw = pos_weight.to(device) if pos_weight is not None else None
@@ -213,7 +256,10 @@ def _prepare(
         eval_ds = _InMemoryDataset(eval_ds)  # type: ignore[assignment]
     x0, y0, _m = train_ds[0]
     model, info = _make_model(cfg, n_labels=int(y0.shape[0]), in_dim=int(x0.numel()))
-    eval_loader = DataLoader(eval_ds, batch_size=int(cfg.batch_size), shuffle=False)
+    model = _maybe_wrap_data_parallel(model, cfg)
+    eval_loader = DataLoader(
+        eval_ds, batch_size=int(cfg.batch_size), shuffle=False, **_loader_kwargs(cfg)
+    )
     pw = _pos_weight(train_labels_csv) if cfg.loss == "balanced_bce" else None
     return train_ds, eval_loader, model, info, pw
 
@@ -232,7 +278,9 @@ def _build_eval_loader(
     )
     if max(cfg.image_size) <= 64:
         ds = _InMemoryDataset(ds)
-    return DataLoader(ds, batch_size=int(cfg.batch_size), shuffle=False)
+    return DataLoader(
+        ds, batch_size=int(cfg.batch_size), shuffle=False, **_loader_kwargs(cfg)
+    )
 
 
 def _eval_payload(
@@ -253,7 +301,9 @@ def _run_centralized(
     cfg: PaperRunConfig,
     pos_weight: torch.Tensor | None,
 ) -> dict[str, Any]:
-    loader = DataLoader(train_ds, batch_size=int(cfg.batch_size), shuffle=True)
+    loader = DataLoader(
+        train_ds, batch_size=int(cfg.batch_size), shuffle=True, **_loader_kwargs(cfg)
+    )
     losses: list[float] = []
     for e in range(int(cfg.epochs)):
         losses.append(_train_model(model, loader, cfg=cfg, pos_weight=pos_weight, round_seed=e))
@@ -272,21 +322,29 @@ def _run_federated(
     split = read_split_json(split_json)
     clients: dict[str, list[str]] = split["clients"]
     client_keys = sorted(clients.keys(), key=lambda x: int(x))
-    global_sd = OrderedDict({k: v.detach().cpu().clone() for k, v in model.state_dict().items()})
+    global_sd = _state_dict_cpu(model)
+    dev = _device_for(cfg)
     round_losses: list[float] = []
     upload_bytes: list[int] = []
     for r in range(int(cfg.rounds)):
         local_sds = []
         weights = []
         losses = []
-        global_vec = torch.nn.utils.parameters_to_vector(list(model.parameters())).detach().clone()
+        global_vec = (
+            torch.nn.utils.parameters_to_vector(list(_unwrap_model(model).parameters()))
+            .detach()
+            .clone()
+            .to(dev)
+        )
         for ck in client_keys:
             idxs = train_ds.indices_for_ids(list(clients[ck]))
             if not idxs:
                 continue
-            model.load_state_dict(global_sd)
+            _load_state_dict(model, global_sd)
             subset = Subset(train_ds, idxs)
-            loader = DataLoader(subset, batch_size=int(cfg.batch_size), shuffle=True)
+            loader = DataLoader(
+                subset, batch_size=int(cfg.batch_size), shuffle=True, **_loader_kwargs(cfg)
+            )
             loss = _train_model(
                 model,
                 loader,
@@ -295,13 +353,11 @@ def _run_federated(
                 global_vec=global_vec if cfg.method in {"fedprox", "robust_fedprox"} else None,
                 round_seed=int(cfg.seed) + r * 1000 + int(ck),
             )
-            local_sds.append(
-                OrderedDict({k: v.detach().cpu().clone() for k, v in model.state_dict().items()}),
-            )
+            local_sds.append(_state_dict_cpu(model))
             weights.append(float(len(idxs)))
             losses.append(loss)
         global_sd = fedavg_state_dict(local_sds, weights)
-        model.load_state_dict(global_sd)
+        _load_state_dict(model, global_sd)
         round_losses.append(float(sum(losses) / max(len(losses), 1)))
         upload_bytes.append(_trainable_nbytes(model) * len(local_sds))
     return {
@@ -334,7 +390,8 @@ def _run_agent_federated(
     clients: dict[str, list[str]] = split["clients"]
     client_keys = sorted(clients.keys(), key=lambda x: int(x))
     noisy = {int(c) for c in cfg.agent_noisy_clients}
-    global_sd = OrderedDict({k: v.detach().cpu().clone() for k, v in model.state_dict().items()})
+    global_sd = _state_dict_cpu(model)
+    dev = _device_for(cfg)
     round_losses: list[float] = []
     upload_bytes: list[int] = []
     weight_history: list[dict[str, float]] = []
@@ -344,14 +401,21 @@ def _run_agent_federated(
         sizes: list[float] = []
         cks: list[str] = []
         losses = []
-        global_vec = torch.nn.utils.parameters_to_vector(list(model.parameters())).detach().clone()
+        global_vec = (
+            torch.nn.utils.parameters_to_vector(list(_unwrap_model(model).parameters()))
+            .detach()
+            .clone()
+            .to(dev)
+        )
         for ck in client_keys:
             idxs = train_ds.indices_for_ids(list(clients[ck]))
             if not idxs:
                 continue
-            model.load_state_dict(global_sd)
+            _load_state_dict(model, global_sd)
             subset = Subset(train_ds, idxs)
-            loader = DataLoader(subset, batch_size=int(cfg.batch_size), shuffle=True)
+            loader = DataLoader(
+                subset, batch_size=int(cfg.batch_size), shuffle=True, **_loader_kwargs(cfg)
+            )
             flip = float(cfg.agent_client_noise) if int(ck) in noisy else 0.0
             loss = _train_model(
                 model,
@@ -362,9 +426,7 @@ def _run_agent_federated(
                 round_seed=int(cfg.seed) + r * 1000 + int(ck),
                 label_flip_p=flip,
             )
-            local_sds.append(
-                OrderedDict({k: v.detach().cpu().clone() for k, v in model.state_dict().items()}),
-            )
+            local_sds.append(_state_dict_cpu(model))
             sizes.append(float(len(idxs)))
             cks.append(ck)
             losses.append(loss)
@@ -373,7 +435,7 @@ def _run_agent_federated(
             scorer = probe_loader if probe_loader is not None else eval_loader
             probe_scores = []
             for sd in local_sds:
-                model.load_state_dict(sd)
+                _load_state_dict(model, sd)
                 y, p = _predict(model, scorer, device=cfg.device)
                 # Negative validation BCE: more sensitive to label-noise damage
                 # than AUROC, so clean clients score clearly higher than noisy.
@@ -393,7 +455,7 @@ def _run_agent_federated(
 
         weight_history.append({ck: float(w) for ck, w in zip(cks, weights)})
         global_sd = fedavg_state_dict(local_sds, weights)
-        model.load_state_dict(global_sd)
+        _load_state_dict(model, global_sd)
         round_losses.append(float(sum(losses) / max(len(losses), 1)))
         upload_bytes.append(_trainable_nbytes(model) * len(local_sds))
 
@@ -427,8 +489,11 @@ def _run_local_only(
         if not idxs:
             continue
         model, _info = _make_model(cfg, n_labels=n_labels, in_dim=in_dim)
+        model = _maybe_wrap_data_parallel(model, cfg)
         subset = Subset(train_ds, idxs)
-        loader = DataLoader(subset, batch_size=int(cfg.batch_size), shuffle=True)
+        loader = DataLoader(
+            subset, batch_size=int(cfg.batch_size), shuffle=True, **_loader_kwargs(cfg)
+        )
         for e in range(int(cfg.epochs)):
             _train_model(model, loader, cfg=cfg, pos_weight=pos_weight, round_seed=e + int(ck))
         metrics.append(_eval_payload(model, eval_loader, cfg=cfg))
