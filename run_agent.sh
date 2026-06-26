@@ -53,6 +53,10 @@ run_stage1() {
   echo " [stage1] 汇总 verdict (fedavg vs robust vs agent)"
   echo "==================================================================="
   python3 -m fed_agent.tools.summarize_agent "${STAGE1_OUT}/summary.json"
+  echo "--- 生成图表 (权重轨迹 + AUROC) -> docs/figures/stage1 ---"
+  python3 -m fed_agent.tools.make_agent_figures \
+    --results_dir "${STAGE1_OUT}" --out_dir docs/figures/stage1 || \
+    echo "(图表生成跳过: 需 pip install -e '.[paper]' 装 matplotlib)"
   echo ">>> 若 agent 在 het04 / het04_dir 上 3 seed 一致 WINS, 再跑: ./run_agent.sh full"
 }
 
@@ -72,6 +76,10 @@ run_full() {
   echo " [3/3] 汇总对比 (fedavg vs robust vs agent)"
   echo "==================================================================="
   python3 -m fed_agent.tools.summarize_agent "${OUT}/summary.json"
+  echo "--- 生成图表 (权重轨迹 + AUROC) -> docs/figures/full ---"
+  python3 -m fed_agent.tools.make_agent_figures \
+    --results_dir "${OUT}" --out_dir docs/figures/full || \
+    echo "(图表生成跳过: 需 pip install -e '.[paper]' 装 matplotlib)"
 }
 
 case "${MODE}" in
