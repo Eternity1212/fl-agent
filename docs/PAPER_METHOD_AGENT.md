@@ -176,6 +176,39 @@ lever; (iii) milder noise p=0.2 (`het02_*`).
 
 ---
 
+## 6. Discussion
+
+**Static regularization is the wrong tool under heterogeneous noise.** A central,
+perhaps counter-intuitive, finding is that the static robust baseline
+(Robust-FedProx: fixed proximal `μ=0.05` + positive-dropout, uniformly applied) is
+*worse* than plain FedAvg under heterogeneous label noise (0.669 vs 0.738
+macro-AUROC, Table A). Two mechanisms explain this. First, the regularization is
+applied *indiscriminately*: it constrains the clean clients just as much as the
+noisy ones, degrading the very updates we want to keep. Second, a *fixed* strength
+cannot match the per-client, per-round severity of corruption — our FedProx `μ`
+sweep shows small `μ` ≈ FedAvg while larger `μ` collapses accuracy, so no single
+constant is right for all clients simultaneously. This is direct evidence that the
+problem is not "insufficient robustness" but "non-adaptive robustness." The agent
+resolves both issues: it acts *selectively* (only the clients whose probe scores
+fall below the round median are down-weighted/constrained) and *adaptively* (the
+intervention strength tracks the telemetry each round), which is precisely why it
+turns the −0.069 regression of static robustness into a +0.066 improvement.
+
+**Interpretability as a deployment asset.** Because every decision is grounded in a
+scalar probe score per client per round, the agent's behavior is auditable: one
+can plot exactly which center was down-weighted and why (Figure W). In a
+multi-center clinical setting this transparency is valuable — a silently
+mis-weighted site is a liability, whereas a logged, explainable weighting decision
+can be reviewed by data-governance stakeholders.
+
+**Two levers, different regimes.** Adaptive weighting and adaptive `μ` are
+complementary rather than additive (Sec. 3.3): when a noisy client can be safely
+down-weighted (IID), weighting suffices and `μ` is redundant; when it cannot be
+discarded without losing unique label coverage (non-IID), constraint via `μ`
+becomes the relevant lever. Our non-IID ablation isolates this boundary.
+
+---
+
 ## 填数指引 (中文)
 
 GPU 上 stage1/full 跑完后:
