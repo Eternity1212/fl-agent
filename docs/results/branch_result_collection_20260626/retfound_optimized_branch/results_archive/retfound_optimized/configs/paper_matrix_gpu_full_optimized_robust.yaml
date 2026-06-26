@@ -1,0 +1,38 @@
+version: paper_matrix.v1
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  test_labels_csv: data/raw/rfmid_full/test/labels.csv
+  test_images_dir: data/raw/rfmid_full/test/images
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+defaults:
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 20
+  rounds: 40
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.05
+  device: cuda
+  require_retfound: true
+  loss: balanced_bce
+  positive_dropout: 0.0
+  train_label_noise: 0.0
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  use_data_parallel: true
+
+runs:
+  - name: robust_fedprox_s0_opt
+    method: robust_fedprox
+    seed: 0
+    positive_dropout: 0.1
+    split_json: configs/splits/generated/labels__iid_K4_S0.json

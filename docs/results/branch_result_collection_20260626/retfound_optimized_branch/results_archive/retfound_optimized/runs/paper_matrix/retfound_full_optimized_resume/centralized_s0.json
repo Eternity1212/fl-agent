@@ -1,0 +1,91 @@
+{
+  "name": "centralized_s0",
+  "config": {
+    "method": "centralized",
+    "backbone": "retfound_mae_vit_large",
+    "seed": 0,
+    "epochs": 20,
+    "rounds": 40,
+    "local_epochs": 1,
+    "batch_size": 16,
+    "lr": 0.001,
+    "fedprox_mu": 0.05,
+    "loss": "balanced_bce",
+    "positive_dropout": 0.0,
+    "train_label_noise": 0.0,
+    "image_size": [
+      224,
+      224
+    ],
+    "device": "cuda",
+    "lora_rank": 8,
+    "lora_alpha": 16.0,
+    "require_retfound": true
+  },
+  "result": {
+    "config": {
+      "method": "centralized",
+      "backbone": "retfound_mae_vit_large",
+      "seed": 0,
+      "epochs": 20,
+      "rounds": 40,
+      "local_epochs": 1,
+      "batch_size": 16,
+      "lr": 0.001,
+      "fedprox_mu": 0.05,
+      "loss": "balanced_bce",
+      "positive_dropout": 0.0,
+      "train_label_noise": 0.0,
+      "image_size": [
+        224,
+        224
+      ],
+      "device": "cuda",
+      "lora_rank": 8,
+      "lora_alpha": 16.0,
+      "require_retfound": true
+    },
+    "model_info": {
+      "requested_backbone": "retfound_mae_vit_large",
+      "actual_backbone": "retfound_mae_vit_large",
+      "is_retfound": true,
+      "checkpoint_path": "/home/tiger/.cache/huggingface/hub/models--YukunZhou--RETFound_mae_natureCFP/snapshots/556830f78214f0e8da35af965292ac5a3180ac47/RETFound_mae_natureCFP.pth",
+      "lora_rank": 8,
+      "lora_alpha": 16.0,
+      "trainable_params": 1226798,
+      "total_params": 304528430
+    },
+    "train_loss": [
+      0.5184760448833307,
+      0.43999864235520364,
+      0.38517851506670314,
+      0.3468292510757844,
+      0.30710664292176565,
+      0.27654290397961934,
+      0.24160779546946287,
+      0.21208166604240736,
+      0.19009002869327862,
+      0.1626141034066677,
+      0.145995216195782,
+      0.13340481898436943,
+      0.1221212967298925,
+      0.10945667422687014,
+      0.0982236805682381,
+      0.08793317647650838,
+      0.07605618420056999,
+      0.07244120058603584,
+      0.0681255020511647,
+      0.06564841205254197
+    ],
+    "eval": {
+      "threshold": 0.5,
+      "micro_f1": 0.6864738076622361,
+      "macro_f1_present": 0.2273008286037904,
+      "best_threshold": 0.2,
+      "best_micro_f1": 0.6263879817112998,
+      "best_macro_f1_present": 0.24396612169069462,
+      "macro_ap": 0.2866425736569786,
+      "macro_auroc": 0.8138529595005327
+    }
+  }
+}

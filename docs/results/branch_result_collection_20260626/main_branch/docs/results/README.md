@@ -5,8 +5,3 @@
 - **`docs/examples/fed_smoke_metrics.example.json`**：字段示意，非真实跑分。
 
 更新快照时请在文件头注明：`date`、`git commit`、`python/torch 版本`、`数据子集说明`。
-
-## 跨分支结果汇总
-
-- 2026-06-26 跨分支结果合集：见 `branch_result_collection_20260626/README.md`。
-- 该合集把 `main` 的结果摘要、`results/retfound-optimized` 的 29-run RETFound 归档、`feat/agent-orchestration` 的 agent 结果统一复制到同一目录，方便下一次续跑和写论文时核对。

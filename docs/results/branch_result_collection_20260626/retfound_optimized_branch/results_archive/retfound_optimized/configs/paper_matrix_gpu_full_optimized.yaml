@@ -1,0 +1,62 @@
+version: paper_matrix.v1
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  test_labels_csv: data/raw/rfmid_full/test/labels.csv
+  test_images_dir: data/raw/rfmid_full/test/images
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+defaults:
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 20
+  rounds: 40
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.05
+  device: cuda
+  require_retfound: true
+  loss: balanced_bce
+  positive_dropout: 0.0
+  train_label_noise: 0.0
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  use_data_parallel: true
+
+runs:
+  - { name: centralized_s0,     method: centralized,    seed: 0 }
+  - { name: local_only_s0,      method: local_only,     seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: fedavg_s0,          method: fedavg,         seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: fedprox_s0,         method: fedprox,        seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: robust_fedprox_s0,  method: robust_fedprox, seed: 0, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: centralized_s1,     method: centralized,    seed: 1 }
+  - { name: local_only_s1,      method: local_only,     seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: fedavg_s1,          method: fedavg,         seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: fedprox_s1,         method: fedprox,        seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: robust_fedprox_s1,  method: robust_fedprox, seed: 1, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: centralized_s2,     method: centralized,    seed: 2 }
+  - { name: local_only_s2,      method: local_only,     seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: fedavg_s2,          method: fedavg,         seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: fedprox_s2,         method: fedprox,        seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: robust_fedprox_s2,  method: robust_fedprox, seed: 2, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: ablate_fedavg_noise02,   method: fedavg,         seed: 0, train_label_noise: 0.2, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: ablate_fedavg_noise04,   method: fedavg,         seed: 0, train_label_noise: 0.4, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: ablate_robust_noise02,   method: robust_fedprox, seed: 0, positive_dropout: 0.1, train_label_noise: 0.2, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: ablate_robust_noise04,   method: robust_fedprox, seed: 0, positive_dropout: 0.1, train_label_noise: 0.4, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: ablate_fedavg_dir_a0p1,  method: fedavg,         seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: ablate_fedprox_dir_a0p1, method: fedprox,        seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: ablate_robust_dir_a0p1,  method: robust_fedprox, seed: 0, positive_dropout: 0.1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: ablate_fedavg_dir_a0p5,  method: fedavg,         seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json }
+  - { name: ablate_fedprox_dir_a0p5, method: fedprox,        seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json }
+  - { name: ablate_robust_dir_a0p5,  method: robust_fedprox, seed: 0, positive_dropout: 0.1, split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json }
+  - { name: ablate_robust_rank4,     method: robust_fedprox, seed: 0, positive_dropout: 0.1, lora_rank: 4,  lora_alpha: 8.0,  split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: ablate_robust_rank16,    method: robust_fedprox, seed: 0, positive_dropout: 0.1, lora_rank: 16, lora_alpha: 32.0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: ablate_fedprox_mu0p01,   method: fedprox,        seed: 0, fedprox_mu: 0.01, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: ablate_fedprox_mu0p1,    method: fedprox,        seed: 0, fedprox_mu: 0.1,  split_json: configs/splits/generated/labels__iid_K4_S0.json }

@@ -1,0 +1,74 @@
+{
+  "name": "local_only_s2",
+  "config": {
+    "method": "local_only",
+    "backbone": "retfound_mae_vit_large",
+    "seed": 2,
+    "epochs": 20,
+    "rounds": 40,
+    "local_epochs": 1,
+    "batch_size": 16,
+    "lr": 0.001,
+    "fedprox_mu": 0.05,
+    "loss": "balanced_bce",
+    "positive_dropout": 0.0,
+    "train_label_noise": 0.0,
+    "image_size": [
+      224,
+      224
+    ],
+    "device": "cuda",
+    "lora_rank": 8,
+    "lora_alpha": 16.0,
+    "require_retfound": true,
+    "num_workers": 8,
+    "pin_memory": true,
+    "persistent_workers": true,
+    "use_data_parallel": true
+  },
+  "result": {
+    "config": {
+      "method": "local_only",
+      "backbone": "retfound_mae_vit_large",
+      "seed": 2,
+      "epochs": 20,
+      "rounds": 40,
+      "local_epochs": 1,
+      "batch_size": 16,
+      "lr": 0.001,
+      "fedprox_mu": 0.05,
+      "loss": "balanced_bce",
+      "positive_dropout": 0.0,
+      "train_label_noise": 0.0,
+      "image_size": [
+        224,
+        224
+      ],
+      "device": "cuda",
+      "lora_rank": 8,
+      "lora_alpha": 16.0,
+      "require_retfound": true,
+      "num_workers": 8,
+      "pin_memory": true,
+      "persistent_workers": true,
+      "use_data_parallel": true
+    },
+    "model_info": {
+      "requested_backbone": "retfound_mae_vit_large",
+      "actual_backbone": "retfound_mae_vit_large",
+      "is_retfound": true,
+      "checkpoint_path": "/home/tiger/.cache/huggingface/hub/models--YukunZhou--RETFound_mae_natureCFP/snapshots/556830f78214f0e8da35af965292ac5a3180ac47/RETFound_mae_natureCFP.pth",
+      "lora_rank": 8,
+      "lora_alpha": 16.0,
+      "trainable_params": 1226798,
+      "total_params": 304528430
+    },
+    "eval": {
+      "best_macro_f1_present": 0.15686428597551166,
+      "best_micro_f1": 0.5675941737102281,
+      "macro_f1_present": 0.1535987508608747,
+      "micro_f1": 0.5410397657208627
+    },
+    "n_clients": 4
+  }
+}
