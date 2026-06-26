@@ -147,6 +147,12 @@ python3 -m fed_agent.tools.build_splits --labels_csv path/to/RFMiD_Training_Labe
 2. 用 `python3 -m fed_agent.tools.summarize_fed_smoke runs/metrics.json` 可以把 JSON **读成人能看懂的摘要**（已在示例文件上演示过）。
 3. **「整个课题做完」**和**「这个代码仓库的软件交付」**不是一回事；仓库里能稳定跑通的部分写在 [docs/PROJECT_SCOPE.md](docs/PROJECT_SCOPE.md)，论文里还要做的 RETFound 全量训练、多中心数据、临床分析等仍按 [docs/ROADMAP.md](docs/ROADMAP.md) 推进。
 
+## 最新 Agent 结果快照
+
+- 2026-06-26 v2 交接结果：见 [docs/AGENT_HANDOFF_STATUS.md](docs/AGENT_HANDOFF_STATUS.md)。
+- 关键结果摘要：见 [docs/results/agent_handoff_20260626_v2.md](docs/results/agent_handoff_20260626_v2.md)。
+- 已强制追踪的原始结果 JSON 位于 `runs/paper_matrix/agent_stage1/` 与 `runs/paper_matrix/agent/`，仅包含脱敏实验指标，不包含原始医学图像数据。
+
 ## License
 
 Project code: **MIT** (see `LICENSE`). **Dataset licenses are separate** — see `docs/DATA_CARD.md`.
