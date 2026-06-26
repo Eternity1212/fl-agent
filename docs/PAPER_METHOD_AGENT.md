@@ -114,43 +114,65 @@ communication; the backbone stays frozen and only adapters move.
 
 ---
 
-## 5. Results (模板, 待填数)
+## 5. Results
+
+> 状态:het04 IID 主结果已坐实(GPU, 3 seed)。clean 对照与 non-IID/μ 消融待 full
+> matrix 跑完填入(标 [[..]])。
 
 ### 5.x Adaptive orchestration under heterogeneous label noise
 
 **Setup.** `K=4` clients, two designated noisy clients (`N={2,3}`) with flip rate
-`p∈{0.2,0.4}`, IID and Dirichlet(α=0.1) splits, seeds {0,1,2}. RETFound+LoRA
-(rank 8), 40 rounds. The agent probes on the validation split and we report on the
-held-out test split (no leakage).
+`p=0.4`, IID and Dirichlet(α=0.1) splits, seeds {0,1,2}. RETFound+LoRA (rank 8),
+40 rounds. The agent probes on the validation split and we report on the held-out
+test split (no leakage). `τ=0.03`.
 
 **Mechanism works (Figure W).** Figure W (`fig_agent_weights.png`) plots the
 aggregation weight fraction per client over rounds. The agent progressively
-suppresses the two noisy clients (red, dashed) below the uniform `1/K` line while
-promoting the clean clients (blue), confirming it identifies corruption from
-probe telemetry alone — without being told which clients are noisy.
+suppresses the two noisy clients (red, dashed) toward zero weight while promoting
+the clean clients (blue), confirming it identifies corruption from probe telemetry
+alone — without being told which clients are noisy. Quantitatively, by the final
+round the mean aggregation weight is ≈0.50/0.50 for the two clean clients and
+≈0.00/0.00 for the two noisy clients, driven by a clean separation in probe
+scores (clean ≈ −0.11/−0.13 vs noisy ≈ −2.57/−2.41 negative-BCE in a
+representative seed).
 
-**Accuracy (Table A / Figure B).**
+**Accuracy (Table A / Figure B).** Macro-AUROC, mean±std over 3 seeds, RFMiD,
+heterogeneous label noise p=0.4, IID:
 
-| condition | method | macro-AUROC | micro-F1@0.5 |
-|---|---|---|---|
-| het noise p=0.4 (IID) | FedAvg | [[0.7375±0.000]] | [[0.11±..]] |
-| het noise p=0.4 (IID) | Robust-FedProx | [[..]] | [[..]] |
-| het noise p=0.4 (IID) | **Agent (ours)** | **[[..]]** | **[[..]]** |
-| het noise p=0.4 (non-IID) | FedAvg | [[..]] | [[..]] |
-| het noise p=0.4 (non-IID) | **Agent (ours)** | **[[..]]** | **[[..]]** |
+| method | macro-AUROC | per-seed |
+|---|---|---|
+| FedAvg | 0.738 ± 0.001 | 0.7374 / 0.7377 / 0.7389 |
+| Robust-FedProx (μ=0.05, dropout=0.1) | 0.669 ± 0.005 | 0.6669 / 0.6762 / 0.6637 |
+| **Agent (ours)** | **0.804 ± 0.010** | 0.7908 / 0.8102 / 0.8120 |
 
-Under heterogeneous noise the agent improves macro-AUROC by `[[+Δ]]` over FedAvg
-and `[[+Δ]]` over static Robust-FedProx (consistent across 3 seeds), and recovers
-the default-threshold micro-F1 that collapses for FedAvg due to noise-induced
-miscalibration.
+Under heterogeneous noise the agent improves macro-AUROC by **+0.066** over FedAvg
+and **+0.135** over static Robust-FedProx, consistently across all 3 seeds (every
+agent seed exceeds every FedAvg seed). The agent recovers ≈76% of the gap between
+the noisy FedAvg baseline (0.738) and the clean ceiling (clean FedAvg 0.825,
+seed 0), i.e. it nearly neutralizes the damage of 40% label flipping on half the
+clients.
 
-**Clean control.** On clean data the agent matches FedAvg within `[[±Δ]]`
-AUROC, i.e. it pays no cost when adaptation is unnecessary — a property static
-robust methods lack.
+**Static robustness hurts here.** Notably, Robust-FedProx is *worse* than plain
+FedAvg (0.669 vs 0.738). Applying a fixed proximal term and dropout uniformly
+over-constrains the clean clients while failing to isolate the noisy ones — direct
+evidence that, for foundation-model PEFT under heterogeneous noise, the right
+intervention is *per-client adaptivity*, not stronger static regularization. This
+motivates the agent's selective, telemetry-driven design.
 
-**Ablations (Table C).** (i) `τ` gate hardness; (ii) adaptive-`μ` on/off
-(`agentmu`) and `μ`-only (`muonly`) to isolate each lever; (iii) the non-IID
-condition where down-weighting alone is insufficient.
+**Clean control.** On clean data the agent matches FedAvg within `[[±Δ]]` AUROC
+(clean FedAvg s0 = 0.825; clean agent = [[..]]), i.e. it pays no cost when
+adaptation is unnecessary — a property static robust methods lack. [待 clean_agent]
+
+**Non-IID (honest caveat / ablation).** Under Dirichlet(α=0.1) + noise, plain
+adaptive *weighting* alone does not beat FedAvg (`het04_dir`: FedAvg = 0.533,
+agent = [[..]]): when noisy clients also hold label coverage unavailable
+elsewhere, down-weighting them discards needed signal. This is the regime the
+adaptive per-client `μ` targets (constrain rather than discard); we evaluate
+`het04_dir_agentmu` to test whether it recovers this case. [待 dir_agentmu]
+
+**Ablations (Table C).** (i) `τ` gate hardness (`het04_agent_tau002/005`);
+(ii) adaptive-`μ` on/off (`agentmu`) and `μ`-only (`muonly`) to isolate each
+lever; (iii) milder noise p=0.2 (`het02_*`).
 
 ---
 
