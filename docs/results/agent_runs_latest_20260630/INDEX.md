@@ -1,6 +1,6 @@
-# Agent 全矩阵最新结果索引 (截至 2026-06-30)
+# Agent 全矩阵最新结果索引 (截至 2026-06-30, 含 tau 消融)
 
-> 核心指标用 **macro_auroc / macro_ap**(阈值无关、多标签稳健)。best_micro_f1 受阈值选择影响大,仅作参考。
+> 核心指标用 **macro_auroc / macro_ap**(阈值无关、多标签稳健)。best_micro_f1 受阈值影响大,仅参考。
 
 | 文件 | method | agg | seed | macro_auroc | macro_ap | best_micro_f1 |
 |---|---|---|---|---|---|---|
@@ -9,6 +9,8 @@
 | agent/het02_agent_s0.json | agent_fed | agent | 0 | 0.7812 | 0.2663 | 0.6590 |
 | agent/het02_fedavg_s0.json | agent_fed | size | 0 | 0.7211 | 0.2426 | 0.3035 |
 | agent/het02_robust_s0.json | agent_fed | size | 0 | 0.7302 | 0.1914 | 0.5956 |
+| agent/het04_agent_tau002_s0.json | agent_fed | agent | 0 | 0.8032 | 0.2729 | 0.6779 |
+| agent/het04_agent_tau005_s0.json | agent_fed | agent | 0 | 0.7933 | 0.2688 | 0.6864 |
 | agent/het04_agentmu_s0.json | agent_fed | agent | 0 | 0.7973 | 0.2720 | 0.7057 |
 | agent/het04_agentmu_s1.json | agent_fed | agent | 1 | 0.8309 | 0.2611 | 0.6518 |
 | agent/het04_agentmu_s2.json | agent_fed | agent | 2 | 0.7874 | 0.2558 | 0.6034 |
