@@ -113,3 +113,19 @@ runs:
   - { name: het04_dir05_fedavg_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json }
   - { name: het04_dir05_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json }
   - { name: het04_dir05_floor_s0,  agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json }
+
+  # ===========================================================================
+  # E. 补齐 3 seed 的剩余消融 (让全表都有 mean±std)
+  # ===========================================================================
+  # --- muonly (size + 自适应mu) 补 s1/s2; het04 主条件已有 s0 ---
+  - { name: het04_muonly_s1, agent_aggregation: size, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_muonly_s2, agent_aggregation: size, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  # --- 非IID agentmu(无floor) 补 s1/s2; 主矩阵已有 dir_agentmu_s0 ---
+  - { name: het04_dir_agentmu_s1, agent_aggregation: agent, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_agentmu_s2, agent_aggregation: agent, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+
+  # ===========================================================================
+  # F. tau 软硬程度消融 (此前主矩阵未跑完, 在此一并补上)
+  # ===========================================================================
+  - { name: het04_agent_tau002_s0, agent_aggregation: agent, agent_tau: 0.02, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_agent_tau005_s0, agent_aggregation: agent, agent_tau: 0.05, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
