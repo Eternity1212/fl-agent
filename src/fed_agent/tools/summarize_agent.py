@@ -18,15 +18,30 @@ from typing import Any
 METRICS = ["macro_auroc", "macro_ap", "best_macro_f1_present", "best_micro_f1"]
 
 
+# Canonical method tokens (order matters for combined names like agentmu+floor).
+KNOWN_METHODS = [
+    "fedavg",
+    "robust",
+    "ccr",
+    "muonly",
+    "agentmu",
+    "agent",
+    "floor03",
+    "floor",
+]
+
+
 def _variant(name: str, cfg: dict[str, Any]) -> tuple[str, str]:
-    """Return (condition, method) parsed from run name like 'het04_agent_s1'."""
+    """Return (condition, method) parsed from run name like 'het04_agentmu_floor_s1'.
+
+    Method may combine multiple tokens (e.g. 'agentmu+floor'); the leftover tokens
+    form the condition (e.g. 'het04_dir').
+    """
     base = name.rsplit("_s", 1)[0]  # strip trailing _s<seed>
     parts = base.split("_")
-    # method is the token among known set; condition is the rest
-    known = {"fedavg", "robust", "agent", "agentmu"}
-    method = next((p for p in parts if p in known), "?")
-    cond = "_".join(p for p in parts if p not in known)
-    # disambiguate tau ablations carried in the leftover (e.g. het04_tau002)
+    found = [m for m in KNOWN_METHODS if m in parts]
+    method = "+".join(found) if found else "?"
+    cond = "_".join(p for p in parts if p not in found)
     return cond or "main", method
 
 
@@ -68,19 +83,27 @@ def main(argv: list[str] | None = None) -> int:
     print(f"held-out probe used by: {len(heldout)} agent runs\n")
     for cond in conds:
         print(f"-- condition: {cond} --")
-        header = f"{'method':<8} | " + " | ".join(f"{m:<16}" for m in METRICS)
+        header = f"{'method':<14} | " + " | ".join(f"{m:<16}" for m in METRICS)
         print(header)
         print("-" * len(header))
+        # stable display order: baselines first, then agent variants, then others
+        order = ["fedavg", "robust", "ccr", "muonly", "agent", "agentmu",
+                 "agent+floor03", "agent+floor", "agentmu+floor"]
+        methods_here = [m for (c, m) in buckets if c == cond]
+        ordered = [m for m in order if m in methods_here]
+        ordered += sorted(m for m in methods_here if m not in order)
         fed_auroc = None
-        for method in ["fedavg", "robust", "agent", "agentmu"]:
+        for method in ordered:
             b = buckets.get((cond, method))
             if not b:
                 continue
-            row = f"{method:<8} | " + " | ".join(f"{_agg(b[m]):<16}" for m in METRICS)
+            row = f"{method:<14} | " + " | ".join(f"{_agg(b[m]):<16}" for m in METRICS)
             print(row)
             if method == "fedavg" and b["macro_auroc"]:
                 fed_auroc = mean(b["macro_auroc"])
-        for variant in ["agent", "agentmu"]:
+        for variant in ordered:
+            if variant == "fedavg":
+                continue
             ab = buckets.get((cond, variant))
             if ab and ab["macro_auroc"] and fed_auroc is not None:
                 delta = mean(ab["macro_auroc"]) - fed_auroc
@@ -90,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
                     verdict = "~tie"
                 else:
                     verdict = "loses"
-                print(f">>> {variant}-fedavg macro_auroc delta = {delta:+.4f}  [{verdict}]")
+                print(f">>> {variant} vs fedavg macro_auroc delta = {delta:+.4f}  [{verdict}]")
         print()
     return 0
 

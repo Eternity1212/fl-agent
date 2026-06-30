@@ -1,0 +1,115 @@
+version: paper_matrix.v1
+
+# =============================================================================
+# Agent 补充实验矩阵 (GPU / A100) —— 补齐论文所缺的对照与短板
+# =============================================================================
+# 目标 (对应 docs/RESULTS_ASSESSMENT.md 列出的缺口):
+#   A. 补齐 seed: clean / het02 此前只有 seed0, 这里补 s1/s2 -> 全部 3 seed 才能报 mean±std
+#   B. RHFL/CCR 基线: 学界公认的"客户端置信度重加权"鲁棒 FL 方法 (Fang & Ye, CVPR'22)
+#      作为我们 agent 门控聚合要超越的强基线 (agent_aggregation: ccr)
+#   C. 非IID 短板修复: het04_dir 下门控会塌陷 -> 用 weight_floor(权重下限) 防塌陷,
+#      3 seed 验证修复是否稳定; 同时给 fedavg/agent(无 floor) 补 seed 确认塌陷一致
+#   D. 温和非IID (a=0.5): 看 floor 在中等异质下是否更平滑
+#
+# 公平性: 所有方法在"同一份异质噪声 (客户端2,3脏)"下比较, 与主矩阵一致。
+# 无泄漏: agent 用 validation 打分, final 在 test 上报告。
+#
+# 运行 (推荐用 ./run_supplement.sh, 它会自动下载数据+生成 split+跑这个矩阵):
+#   python3 -m fed_agent.tools.run_paper_matrix \
+#     --matrix_yaml configs/paper_matrix_agent_supp.yaml \
+#     --out_dir runs/paper_matrix/agent_supp
+#
+# 断点续跑: 每个 run 单独存盘, 中断重跑自动跳过已完成 run。
+# 提示: 若想把主矩阵已跑过的 s0 一起纳入同一汇总, 可把那些 json 复制进 out_dir 即跳过。
+# =============================================================================
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  eval_labels_csv: data/raw/rfmid_full/test/labels.csv
+  eval_images_dir: data/raw/rfmid_full/test/images
+  probe_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  probe_images_dir: data/raw/rfmid_full/validation/images
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+defaults:
+  method: agent_fed
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 20
+  rounds: 40
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.0
+  device: cuda
+  require_retfound: true
+  loss: balanced_bce
+  positive_dropout: 0.0
+  train_label_noise: 0.0
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  use_data_parallel: true
+  agent_aggregation: agent
+  agent_tau: 0.03
+  agent_noisy_clients: [2, 3]
+  agent_client_noise: 0.0
+
+runs:
+  # ===========================================================================
+  # A. 补齐 seed: clean + het02 (主矩阵已有 s0, 这里补 s1/s2)
+  # ===========================================================================
+  # --- clean 控制组 ---
+  - { name: clean_fedavg_s1, agent_aggregation: size,  seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: clean_fedavg_s2, agent_aggregation: size,  seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: clean_agent_s1,  agent_aggregation: agent, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: clean_agent_s2,  agent_aggregation: agent, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  # --- het02 (异质噪声 0.2) ---
+  - { name: het02_fedavg_s1, agent_aggregation: size,  agent_client_noise: 0.2, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het02_fedavg_s2, agent_aggregation: size,  agent_client_noise: 0.2, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het02_robust_s1, agent_aggregation: size,  agent_client_noise: 0.2, seed: 1, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het02_robust_s2, agent_aggregation: size,  agent_client_noise: 0.2, seed: 2, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het02_agent_s1,  agent_aggregation: agent, agent_client_noise: 0.2, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het02_agent_s2,  agent_aggregation: agent, agent_client_noise: 0.2, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+
+  # ===========================================================================
+  # B. RHFL / CCR 基线 (客户端置信度 softmax 重加权), het02 + het04 各 3 seed
+  # ===========================================================================
+  - { name: het02_ccr_s0, agent_aggregation: ccr, agent_client_noise: 0.2, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het02_ccr_s1, agent_aggregation: ccr, agent_client_noise: 0.2, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het02_ccr_s2, agent_aggregation: ccr, agent_client_noise: 0.2, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04_ccr_s0, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_ccr_s1, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_ccr_s2, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+
+  # ===========================================================================
+  # C. 非IID (Dirichlet a=0.1) 短板修复: weight_floor 防门控塌陷
+  # ===========================================================================
+  # --- 基线补 seed (主矩阵已有 dir_fedavg_s0 / dir_agent_s0) ---
+  - { name: het04_dir_fedavg_s1, agent_aggregation: size,  agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_fedavg_s2, agent_aggregation: size,  agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04_dir_agent_s1,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_agent_s2,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  # --- agent + weight_floor=0.5 (防塌陷), 3 seed ---
+  - { name: het04_dir_floor_s0, agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_floor_s1, agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_floor_s2, agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  # --- agent + 自适应mu + weight_floor (联合修复), 3 seed ---
+  - { name: het04_dir_agentmu_floor_s0, agent_aggregation: agent, agent_adaptive_mu: true, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_agentmu_floor_s1, agent_aggregation: agent, agent_adaptive_mu: true, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_agentmu_floor_s2, agent_aggregation: agent, agent_adaptive_mu: true, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  # --- floor 强度消融 (floor=0.3) + CCR 在非IID 下的表现 (对照) ---
+  - { name: het04_dir_floor03_s0, agent_aggregation: agent, agent_weight_floor: 0.3, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_ccr_s0,     agent_aggregation: ccr,   agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+
+  # ===========================================================================
+  # D. 温和非IID (Dirichlet a=0.5): floor 是否更平滑 (seed 0)
+  # ===========================================================================
+  - { name: het04_dir05_fedavg_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json }
+  - { name: het04_dir05_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json }
+  - { name: het04_dir05_floor_s0,  agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p5_K4_S0.json }

@@ -46,8 +46,10 @@ class PaperRunConfig:
     persistent_workers: bool = False
     use_data_parallel: bool = False
     # --- agent (adaptive orchestration) options ---
-    agent_aggregation: str = "agent"  # "agent" | "size" (size = FedAvg baseline)
+    agent_aggregation: str = "agent"  # "agent" | "size" (FedAvg) | "ccr" (RHFL baseline)
     agent_tau: float = 0.05
+    agent_ccr_temp: float = 0.05  # softmax temperature for the CCR baseline
+    agent_weight_floor: float = 0.0  # min gate fraction (anti-collapse under non-IID)
     agent_geometry: bool = False
     agent_noisy_clients: tuple[int, ...] = ()  # client ids that get label noise
     agent_client_noise: float = 0.0  # symmetric flip prob for noisy clients
@@ -390,7 +392,11 @@ def _run_agent_federated(
     selective down-weighting can be evaluated against an equal/size-weighted
     FedAvg baseline under identical conditions.
     """
-    from fed_agent.agent.orchestrator import decide_client_mu, decide_weights
+    from fed_agent.agent.orchestrator import (
+        decide_client_mu,
+        decide_weights,
+        decide_weights_ccr,
+    )
 
     split = read_split_json(split_json)
     clients: dict[str, list[str]] = split["clients"]
@@ -399,7 +405,9 @@ def _run_agent_federated(
     global_sd = _state_dict_cpu(model)
     dev = _device_for(cfg)
     use_prox = (cfg.fedprox_mu > 0.0) or bool(cfg.agent_adaptive_mu)
-    need_scores = (cfg.agent_aggregation == "agent") or bool(cfg.agent_adaptive_mu)
+    need_scores = (
+        cfg.agent_aggregation in ("agent", "ccr") or bool(cfg.agent_adaptive_mu)
+    )
     round_losses: list[float] = []
     upload_bytes: list[int] = []
     weight_history: list[dict[str, float]] = []
@@ -474,6 +482,14 @@ def _run_agent_federated(
                 probe_scores=probe_scores,
                 sizes=sizes,
                 tau=float(cfg.agent_tau),
+                weight_floor=float(cfg.agent_weight_floor),
+            )
+            weights = decision.weights
+        elif cfg.agent_aggregation == "ccr":
+            decision = decide_weights_ccr(
+                probe_scores=probe_scores,
+                sizes=sizes,
+                temp=float(cfg.agent_ccr_temp),
             )
             weights = decision.weights
         else:

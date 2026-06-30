@@ -54,6 +54,20 @@ def _sigmoid_gate(scores: list[float], tau: float) -> list[float]:
     return [1.0 / (1.0 + math.exp(-(s - center) / tau)) for s in scores]
 
 
+def _softmax(scores: list[float], temp: float) -> list[float]:
+    """Numerically stable softmax with temperature."""
+    if temp <= 0:
+        # degenerate: hard argmax
+        m = max(scores)
+        out = [1.0 if s == m else 0.0 for s in scores]
+        z = sum(out) or 1.0
+        return [o / z for o in out]
+    m = max(scores)
+    exps = [math.exp((s - m) / temp) for s in scores]
+    z = sum(exps) or 1.0
+    return [e / z for e in exps]
+
+
 def _cosine(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a))
@@ -96,6 +110,38 @@ def decide_client_mu(
     return out
 
 
+def decide_weights_ccr(
+    *,
+    probe_scores: list[float],
+    sizes: list[float],
+    temp: float = 0.05,
+) -> AgentDecision:
+    """RHFL/CCR-style client confidence reweighting baseline.
+
+    Reweights clients by a softmax over their probe confidence
+    (``w_i ∝ size_i * exp(s_i / temp)``), following the "client confidence
+    reweighting" (CCR) idea from Robust Heterogeneous Federated Learning
+    (Fang & Ye, CVPR 2022). Unlike our median-centred gate, the softmax has no
+    reference point: even a set of equally-good clients gets unequal weights and
+    concentrates onto the top scorer, which over-concentrates under non-IID
+    heterogeneity. It serves as the established robust-FL baseline to beat.
+    """
+    n = len(probe_scores)
+    if n == 0:
+        return AgentDecision([], [], [])
+    if len(sizes) != n:
+        raise ValueError("sizes length must match probe_scores")
+    conf = _softmax(probe_scores, temp)
+    raw = [sizes[i] * conf[i] for i in range(n)]
+    z = sum(raw)
+    if z <= 0:
+        zs = sum(sizes) or 1.0
+        raw = [s / zs for s in sizes]
+    else:
+        raw = [r / z for r in raw]
+    return AgentDecision(weights=raw, probe_component=conf, geometry_component=[1.0] * n)
+
+
 def decide_weights(
     *,
     probe_scores: list[float],
@@ -103,6 +149,7 @@ def decide_weights(
     tau: float = 0.05,
     update_vectors: list[list[float]] | None = None,
     geometry_floor: float = 0.0,
+    weight_floor: float = 0.0,
 ) -> AgentDecision:
     """Return adaptive aggregation weights from per-client telemetry.
 
@@ -110,6 +157,11 @@ def decide_weights(
 
     With identical probe scores and no geometry signal, every gate is 0.5 and
     this collapses to size-proportional FedAvg.
+
+    ``weight_floor`` in [0, 1) guarantees every client keeps at least this
+    fraction of its gate (``gate_eff = floor + (1 - floor) * gate``). It prevents
+    the gate from collapsing onto one client under non-IID heterogeneity, where
+    probe-score differences partly reflect distribution shift rather than noise.
     """
     n = len(probe_scores)
     if n == 0:
@@ -118,6 +170,9 @@ def decide_weights(
         raise ValueError("sizes length must match probe_scores")
 
     probe_w = _sigmoid_gate(probe_scores, tau)
+    if weight_floor > 0.0:
+        f = min(max(weight_floor, 0.0), 0.999)
+        probe_w = [f + (1.0 - f) * g for g in probe_w]
 
     geom_w = [1.0] * n
     if update_vectors is not None and n > 1:
