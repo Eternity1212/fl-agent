@@ -78,8 +78,14 @@ runs:
   - { name: het02_agent_s2,  agent_aggregation: agent, agent_client_noise: 0.2, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
 
   # ===========================================================================
-  # B. RHFL / CCR 基线 (客户端置信度 softmax 重加权), het02 + het04 各 3 seed
+  # B. RHFL / CCR 基线 (客户端置信度 softmax 重加权), clean + het02 + het04 各 3 seed
+  #    注意: CCR 在噪声下很强(会正面赢过 agent 门控), 因此差异化必须靠 clean(零代价)
+  #    和非IID(见 C 节 dir_ccr): CCR 过度集中, 预期 clean 会掉数据、非IID 会塌陷。
   # ===========================================================================
+  # --- clean: CCR 即使全干净也会把权重集中到单个客户端 -> 预期掉点 (关键对照) ---
+  - { name: clean_ccr_s0, agent_aggregation: ccr, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: clean_ccr_s1, agent_aggregation: ccr, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: clean_ccr_s2, agent_aggregation: ccr, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
   - { name: het02_ccr_s0, agent_aggregation: ccr, agent_client_noise: 0.2, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
   - { name: het02_ccr_s1, agent_aggregation: ccr, agent_client_noise: 0.2, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
   - { name: het02_ccr_s2, agent_aggregation: ccr, agent_client_noise: 0.2, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
@@ -103,9 +109,12 @@ runs:
   - { name: het04_dir_agentmu_floor_s0, agent_aggregation: agent, agent_adaptive_mu: true, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
   - { name: het04_dir_agentmu_floor_s1, agent_aggregation: agent, agent_adaptive_mu: true, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
   - { name: het04_dir_agentmu_floor_s2, agent_aggregation: agent, agent_adaptive_mu: true, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
-  # --- floor 强度消融 (floor=0.3) + CCR 在非IID 下的表现 (对照) ---
+  # --- floor 强度消融 (floor=0.3) ---
   - { name: het04_dir_floor03_s0, agent_aggregation: agent, agent_weight_floor: 0.3, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
-  - { name: het04_dir_ccr_s0,     agent_aggregation: ccr,   agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  # --- CCR 在非IID 下的表现 (对照, 3 seed): 预期过度集中 -> 塌陷, 反衬 floor 的价值 ---
+  - { name: het04_dir_ccr_s0, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_ccr_s1, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_ccr_s2, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
 
   # ===========================================================================
   # D. 温和非IID (Dirichlet a=0.5): floor 是否更平滑 (seed 0)

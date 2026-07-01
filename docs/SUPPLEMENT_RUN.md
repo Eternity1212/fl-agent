@@ -12,7 +12,12 @@
 | 缺中等异质度对照 | 只有极端 a=0.1 | 新增 a=0.5 一组 |
 | tau / muonly 等消融未跑完 | tau002/tau005 没跑;muonly、dir_agentmu 只有 s0 | 补 tau002_s0/tau005_s0;muonly、dir_agentmu 补到 3 seed |
 
-共 **37 个 run**,与主矩阵同设(RETFound+LoRA、40 轮、探针用 validation、final 在 test)。
+共 **42 个 run**,与主矩阵同设(RETFound+LoRA、40 轮、探针用 validation、final 在 test)。
+
+> **重要(2026-07-01)**:首批 CCR 结果显示 **CCR 在噪声下很强,甚至在 het04 正面赢过 agent 门控**。
+> 因此差异化不能只靠"噪声下更准",必须靠 **clean 零代价** 和 **非IID 稳健**——CCR 过度集中
+> 会在 clean 掉数据、在非IID 塌陷。为此新增 `clean_ccr`(3 seed)和 `het04_dir_ccr`(3 seed)
+> 两组关键对照。详见下方分析与 `docs/RESULTS_ASSESSMENT.md`。
 
 ## 跑完后的 seed 完整性(关键)
 
@@ -20,10 +25,10 @@
 
 | 条件 | 跑完后 3-seed 的方法 | 仅 1-seed(ablation/sweep,惯例如此) |
 |---|---|---|
-| clean | fedavg, agent | — |
+| clean | fedavg, agent, **ccr** | — |
 | het02 | fedavg, robust, **ccr**, agent | — |
 | het04 (IID) | fedavg, robust, **ccr**, agent, agentmu, muonly | tau002, tau005(tau 软硬 sweep) |
-| het04_dir (a=0.1) | fedavg, agent, agentmu, **floor**, **agentmu+floor** | ccr, floor03(floor 强度 sweep) |
+| het04_dir (a=0.1) | fedavg, agent, agentmu, **ccr**, **floor**, **agentmu+floor** | floor03(floor 强度 sweep) |
 | het04_dir05 (a=0.5) | — | fedavg, agent, floor(中等异质探针) |
 
 > 这意味着论文主表(FedAvg / Robust-FedProx / RHFL-CCR / Agent / Agent+floor,跨 clean/het02/het04/het04_dir)**全部 3 seed**。tau / floor 强度 / a=0.5 这些是"调参曲线"和"补充探针",单 seed 即可,论文里不需要 std。
