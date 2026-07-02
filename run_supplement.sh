@@ -15,6 +15,7 @@
 # 子命令:
 #   ./run_supplement.sh smoke        # 本地CPU快速验证管线 (含 ccr/floor 分支), 不需GPU/权重
 #   ./run_supplement.sh data         # 只做数据下载 + split 生成
+#   ./run_supplement.sh dir          # 插队: 只跑判决性非IID续跑 (ccr s1/s2 + agentmu s0 + fedavg/agent s0)
 #   ./run_supplement.sh run          # 跳过数据准备, 只跑矩阵 + 汇总 (数据已就绪时)
 #
 # 环境变量:
@@ -78,6 +79,24 @@ run_smoke() {
   python3 -m fed_agent.tools.summarize_agent "${SMOKE_OUT}/summary.json"
 }
 
+# 判决性非IID 续跑: 只跑卡论文的几个 run, 插队用。已完成的自动跳过, 跑完重写整目录 summary。
+DIR_ONLY="het04_dir_ccr_s1 het04_dir_ccr_s2 het04_dir_agentmu_s0 het04_dir_fedavg_s0 het04_dir_agent_s0"
+run_dir() {
+  echo "==================================================================="
+  echo " 判决性非IID 续跑 (seed-matched): ${DIR_ONLY}"
+  echo "==================================================================="
+  python3 -m fed_agent.tools.check_env || {
+    echo "!! 预检未通过: 请先 export HF_TOKEN=... 或 export RETFOUND_CKPT_PATH=/path/RETFound_mae_natureCFP.pth"
+    exit 1
+  }
+  python3 -m fed_agent.tools.run_paper_matrix \
+    --matrix_yaml "${MATRIX}" \
+    --out_dir "${OUT}" \
+    --only ${DIR_ONLY}
+  echo "--- 汇总 (重点看 het04_dir_* 四方法 seed-matched) ---"
+  python3 -m fed_agent.tools.summarize_agent "${OUT}/summary.json"
+}
+
 run_matrix() {
   echo "==================================================================="
   echo " GPU 预检 (RETFound 权重: HF_TOKEN 或 RETFOUND_CKPT_PATH)"
@@ -105,6 +124,7 @@ run_matrix() {
 case "${MODE}" in
   smoke) run_smoke ;;
   data)  install_deps; prep_data ;;
+  dir)   run_dir ;;
   run)   run_matrix ;;
   all)
     install_deps

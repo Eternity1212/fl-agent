@@ -131,7 +131,8 @@ runs:
   # --- muonly (size + 自适应mu) 补 s1/s2; het04 主条件已有 s0 ---
   - { name: het04_muonly_s1, agent_aggregation: size, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
   - { name: het04_muonly_s2, agent_aggregation: size, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
-  # --- 非IID agentmu(无floor) 补 s1/s2; 主矩阵已有 dir_agentmu_s0 ---
+  # --- 非IID agentmu(无floor) s0/s1/s2; s0 是判决性 run: 测 μ 能否稳住 agent 塌陷的那个种子 ---
+  - { name: het04_dir_agentmu_s0, agent_aggregation: agent, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
   - { name: het04_dir_agentmu_s1, agent_aggregation: agent, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
   - { name: het04_dir_agentmu_s2, agent_aggregation: agent, agent_adaptive_mu: true, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
 
