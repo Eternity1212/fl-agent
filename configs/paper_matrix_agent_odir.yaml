@@ -1,0 +1,100 @@
+version: paper_matrix.v1
+
+# =============================================================================
+# ODIR 第二数据集 —— agent 贡献复现矩阵 (GPU)
+# =============================================================================
+# 目的: 在第二个多标签眼底数据集 ODIR(8类 N/D/G/C/A/H/M/O)上复现 RFMiD 的核心结论,
+#   证明"跨场景鲁棒编排"不是 RFMiD 特有。镜像 RFMiD 的决定性格子:
+#     - het04 IID:   fedavg / robust / ccr / agent  (静态鲁棒是否反噬? agent 是否≈ccr?)
+#     - het04 非IID: fedavg / ccr / agent / floor    (CCR 是否塌陷? floor 是否稳住?)
+#     - clean:       fedavg / agent                  (agent 是否零代价?)
+#
+# 注意: 旧的 configs/paper_matrix_odir.yaml 用的是 method=fedavg/robust + 同质噪声,
+#   测不到 agent/ccr/floor。本文件才是复现 agent 贡献用的。
+#
+# 前置(见 docs/SECOND_DATASET_ODIR.md, 数据/ split 可在 GPU 跑非IID 的同时用 CPU 并行准备):
+#   1) python3 -m fed_agent.tools.export_odir --source hf --out_dir data/raw/odir
+#   2) for s in 0 1 2; do
+#        python3 -m fed_agent.tools.build_splits \
+#          --labels_csv data/raw/odir/train/labels.csv \
+#          --out_dir configs/splits/generated_odir \
+#          --seed $s --n_clients 4 --alphas 0.1 0.5 1.0
+#      done
+#
+# 运行(等 RFMiD 非IID 3-seed 确认主结论后再跑):
+#   python3 -m fed_agent.tools.run_paper_matrix \
+#     --matrix_yaml configs/paper_matrix_agent_odir.yaml \
+#     --out_dir runs/paper_matrix/agent_odir
+#   python3 -m fed_agent.tools.summarize_agent runs/paper_matrix/agent_odir/summary.json
+# =============================================================================
+
+dataset:
+  train_labels_csv: data/raw/odir/train/labels.csv
+  train_images_dir: data/raw/odir/train/images
+  validation_labels_csv: data/raw/odir/validation/labels.csv
+  validation_images_dir: data/raw/odir/validation/images
+  # 无泄漏: 探针用 validation 打分, final 在 test 报告
+  eval_labels_csv: data/raw/odir/test/labels.csv
+  eval_images_dir: data/raw/odir/test/images
+  probe_labels_csv: data/raw/odir/validation/labels.csv
+  probe_images_dir: data/raw/odir/validation/images
+  split_json: configs/splits/generated_odir/labels__iid_K4_S0.json
+
+defaults:
+  method: agent_fed
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 20
+  rounds: 40
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.0
+  device: cuda
+  require_retfound: true
+  loss: balanced_bce
+  positive_dropout: 0.0
+  train_label_noise: 0.0
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  use_data_parallel: true
+  agent_aggregation: agent
+  agent_tau: 0.03
+  agent_noisy_clients: [2, 3]
+  agent_client_noise: 0.0
+
+runs:
+  # ---- clean 对照 (agent 零代价) ----
+  - { name: clean_fedavg_s0, agent_aggregation: size,  seed: 0, split_json: configs/splits/generated_odir/labels__iid_K4_S0.json }
+  - { name: clean_agent_s0,  agent_aggregation: agent, seed: 0, split_json: configs/splits/generated_odir/labels__iid_K4_S0.json }
+
+  # ---- het04 IID (异质噪声 0.4, 客户端2/3脏): fedavg / robust / ccr / agent × 3 seed ----
+  - { name: het04_fedavg_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__iid_K4_S0.json }
+  - { name: het04_fedavg_s1, agent_aggregation: size,  agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__iid_K4_S1.json }
+  - { name: het04_fedavg_s2, agent_aggregation: size,  agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__iid_K4_S2.json }
+  - { name: het04_robust_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated_odir/labels__iid_K4_S0.json }
+  - { name: het04_robust_s1, agent_aggregation: size,  agent_client_noise: 0.4, seed: 1, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated_odir/labels__iid_K4_S1.json }
+  - { name: het04_robust_s2, agent_aggregation: size,  agent_client_noise: 0.4, seed: 2, fedprox_mu: 0.05, positive_dropout: 0.1, split_json: configs/splits/generated_odir/labels__iid_K4_S2.json }
+  - { name: het04_ccr_s0,    agent_aggregation: ccr,   agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__iid_K4_S0.json }
+  - { name: het04_ccr_s1,    agent_aggregation: ccr,   agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__iid_K4_S1.json }
+  - { name: het04_ccr_s2,    agent_aggregation: ccr,   agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__iid_K4_S2.json }
+  - { name: het04_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__iid_K4_S0.json }
+  - { name: het04_agent_s1,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__iid_K4_S1.json }
+  - { name: het04_agent_s2,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__iid_K4_S2.json }
+
+  # ---- het04 非IID (Dirichlet a=0.1 + 噪声0.4): fedavg / ccr / agent / floor × 3 seed ----
+  - { name: het04_dir_fedavg_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_fedavg_s1, agent_aggregation: size,  agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_fedavg_s2, agent_aggregation: size,  agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04_dir_ccr_s0,    agent_aggregation: ccr,   agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_ccr_s1,    agent_aggregation: ccr,   agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_ccr_s2,    agent_aggregation: ccr,   agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04_dir_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_agent_s1,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_agent_s2,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04_dir_floor_s0,  agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_floor_s1,  agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_floor_s2,  agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S2.json }
