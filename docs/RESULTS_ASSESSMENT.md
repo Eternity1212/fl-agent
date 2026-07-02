@@ -49,30 +49,32 @@
 > **agent 对 τ 不敏感**:0.02–0.05 三档 AUROC 都落在 0.79–0.80,均显著高于 FedAvg(0.738)。
 > 说明增益来自机制本身而非精调超参——这是论文里有价值的稳健性证据。
 
-### 表 3 — 非IID(Dirichlet α=0.1 + 噪声 0.4):多 seed 更正版(⚠️ 之前 s0 结论被推翻)
+### 表 3 — 非IID(Dirichlet α=0.1 + 噪声 0.4):seed-matched 定稿版(2026-07-02)
 
-多 seed macro-AUROC(高方差 regime):
+已 seed 对齐(同在 `agent_supp`,fedavg/agent/floor 均 s0/s1/s2):
 
-| 方法 | macro-AUROC | macro-AP | macro-F1 | micro-F1 | seed 备注 |
+| 方法 | macro-AUROC | macro-AP | macro-F1 | micro-F1 | seed |
 |---|---|---|---|---|---|
-| **Agent (仅gate)** | **0.7370 ± 0.049** | 0.2092 | 0.1915 | 0.5965 | ⚠️ 疑仅 s1/s2(见下) |
-| het04_dir_floor | 0.6791 ± 0.044 | 0.1662 | 0.0955 | 0.0881 | s0/s1/s2 |
-| FedAvg | 0.6774 ± 0.042 | 0.1635 | 0.0799 | 0.0744 | s0/s1/s2 |
-| agentmu + floor | 0.6128 ± 0.095 | 0.1244 | 0.1184 | 0.2808 | 方差极大, 不稳 |
-| CCR (RHFL) | 0.5030(s0) | 0.0566 | 0.000 | 0.000 | 仅 s0, 待 s1/s2 |
+| **dir_agentmu(gate+μ)** | **0.7468 ± 0.033** | **0.2306** | **0.2006** | **0.6487** | ⚠️ 仅 s1/s2(缺 s0) |
+| dir_floor | 0.6791 ± 0.044 | 0.1662 | 0.0955 | 0.0881 | s0/s1/s2 |
+| dir_agent(仅gate) | 0.6690 ± **0.104** | 0.1608 | 0.1276 | 0.3977 ± **0.285** | s0/s1/s2 |
+| FedAvg | 0.6475 ± 0.055 | 0.1345 | 0.0784 | 0.0757 | s0/s1/s2 |
+| dir_agentmu+floor | 0.6128 ± 0.095 | 0.1244 | 0.1184 | 0.2808 | s0/s1/s2, 不稳 |
+| CCR (RHFL) | 0.5030(s0) | 0.0566 | 0.000 | 0.000 | 仅 s0, s1/s2 缺失 |
 
-> **重大更正**:我此前"`floor` 把 0.533 救到 0.671、修复非IID 塌陷"的结论,**是基于单个 seed(s0)的
-> 假象,多 seed 下不成立**。更正后的事实:
-> 1. **所谓"非IID 塌陷"是 seed 特异的**:agent 只在 s0 掉到 0.533,s1/s2 恢复到 ~0.74,并非系统性塌陷。
-> 2. **floor 不改善均值**:floor(0.679)≈ FedAvg(0.677),且**低于**未加 floor 的 agent(0.737)——
->    floor 反而把 agent 的门控收益稀释了。**"floor 修复非IID"不成立**,应写成 negative/limitation。
-> 3. **agentmu+floor 更差且方差极大**(0.613 ± 0.095),不能作为稳定方案。
+> **核心诚实结论**:非IID 是**高方差困难 regime,auroc 上无方法显著获胜**——
+> agentmu/floor/agent/fedavg 的 auroc 均值都落在 0.65–0.75,而 agent 的 std 高达 **0.104**、
+> micro-F1 std 高达 **0.285**(区间横跨 0.11→0.68),差异被方差淹没。可写的强结论只有一条:
+> **FedAvg 的 F1 在非IID+噪声下几乎崩(micro-F1 0.076),agent/agentmu 把 F1 拉回 0.40/0.65。**
 >
-> ⚠️ **seed 匹配陷阱(务必修)**:`het04_dir_agent` 的汇总疑似**只含 s1/s2**(其 s0=0.533 在
-> `agent_stage1/` 目录、没进 `agent_supp` 汇总),而 floor/fedavg 含 s0/s1/s2 → **agent 被高估、
-> floor 被低估**,不是公平比较。**必须让 fedavg/agent/floor/ccr 用同一组 s0/s1/s2 重算**才能定论。
-> 逐 seed 已知:s0 上 floor(0.671)> agent(0.533);s1/s2 上 agent(~0.74)> floor(~0.68)。
-> → floor 更像"最坏情况保险(降方差)"而非"提均值",这条要谨慎、待 seed-matched 数据。
+> ⚠️ **agentmu"更强"很可能是 seed 匹配陷阱重演**:dir_agentmu **缺 s0**(=正是 agent 塌陷的那个种子)。
+> 逐 seed 反推:agent 的 s1/s2 auroc ≈ (3×0.669−0.53)/2 ≈ **0.738**,与 agentmu s1/s2 的 **0.747**
+> 几乎相等。→ **在同一组 s1/s2 上 agent ≈ agentmu**,agentmu 的领先主要来自"甩掉了坏种子 s0"。
+> **决定性实验 = `het04_dir_agentmu_s0`**:若它在 s0 不塌 → μ 真能稳住塌陷(升级为贡献);
+> 若也塌 → μ 无效,与 agent 同命。**这是当前单个最高价值的 run**。
+>
+> **floor 定位**:auroc 0.679 略高于 fedavg 0.648、agent 0.669,但 F1(0.088)几乎没救回 →
+> "floor 修复 collapse"仍不成立,顶多"轻微降方差",作 limitation 写。
 >
 > **诚实定位**:非IID 是**高方差困难 regime**;稳的结论只有"**FedAvg 的 F1 基本崩(0.07),
 > agent 门控在 ranking 上明显更好**";floor/μ 的"修复"目前**不成立**。headline 方法回到**纯 Agent 门控**。
