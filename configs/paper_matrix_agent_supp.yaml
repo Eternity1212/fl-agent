@@ -96,7 +96,9 @@ runs:
   # ===========================================================================
   # C. 非IID (Dirichlet a=0.1) 短板修复: weight_floor 防门控塌陷
   # ===========================================================================
-  # --- 基线补 seed (主矩阵已有 dir_fedavg_s0 / dir_agent_s0) ---
+  # --- 基线补 seed (s0 也在此重跑, 保证非IID 四方法 seed-matched 到同一目录) ---
+  - { name: het04_dir_fedavg_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
   - { name: het04_dir_fedavg_s1, agent_aggregation: size,  agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
   - { name: het04_dir_fedavg_s2, agent_aggregation: size,  agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
   - { name: het04_dir_agent_s1,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
