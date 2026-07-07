@@ -239,3 +239,42 @@ clean/het02/het04/het04_dir)将**全部 3 seed**;τ / floor 强度 / a=0.5 为�
 - **第二步**:clean/het02 多 seed + ODIR;非IID 试 weight-floor。
 - **创新定位**:不吹"新算法", 主打"**FM-PEFT 联邦下静态鲁棒失效 + 廉价 adapter 探针
   驱动的自适应编排 + 零代价剂量-响应**"这一实证+方法组合。这是诚实且站得住的。
+
+---
+
+## 6. 最终判词(2026-07-07, 全数据到位后)
+
+### 6.1 数据全景(RFMiD + ODIR)
+
+| 场景 | 赢家 | 关键事实 |
+|---|---|---|
+| clean (RFMiD) | agent 微胜 | micro-F1 0.704 vs 0.681(更稳);auroc 打平 |
+| IID het02 | agent ≈ CCR ≫ fedavg/robust | robust 反噬(最差) |
+| IID het04 | CCR ≈ agentmu ≈ agent ≫ fedavg | agent 方差比 CCR 小(此 regime) |
+| non-IID (RFMiD) | 重加权家族 > 稀释型 | 家族层面成立, 家族内打平(方差大) |
+| non-IID (ODIR) | **CCR > agent** > floor > fedavg | 硬塌陷未复现;agent 非最优、且不如 CCR 稳 |
+
+### 6.2 创新点:诚实分级
+
+- **不成立的强 claim**:❌ "我们发明了更好的聚合方法"——CCR(已有 RHFL)在多数场景 ≥ agent,
+  ODIR 上还更强更稳。agent 的聚合机制**没有**普适的性能/稳定性优势。
+- **成立的中等 claim**(论文可立):
+  1. **实证规律(跨数据集)**:置信度重加权家族在非IID+噪声下优于朴素聚合,**增益随标签空间/
+     非IID 病态严重度放大**(RFMiD 28类硬塌陷 ↔ ODIR 8类温和)——标签数是调节变量。这是有机制、
+     跨两数据集验证的 empirical finding。
+  2. **静态鲁棒反噬**:Robust-FedProx 在异质噪声下反而最差 → 需要自适应。
+  3. **系统 benchmark**:RETFound+LoRA 联邦 + 异质标签噪声 + IID/非IID + 多 seed + 同类 baseline(CCR)。
+  4. **失败边界诚实刻画**:标签覆盖病态 = 开放问题。
+- **待定的关键 claim(决定成败)**:⏳ **自适应零代价 vs CCR 的 clean 代价**。若 `clean_ccr` 掉点而
+  agent 不掉 → agent 相对固定重加权有**唯一的、可辩护的设计优势**(adaptivity),论文从"实证研究"
+  升级为"有设计贡献的方法论文"。若 clean_ccr 不掉 → agent 只是重加权家族一员。
+
+### 6.3 能否支撑论文:结论
+
+**能,但要认清天花板。** 现有数据(即使 clean_ccr 不给力)已支撑一篇**诚实、扎实、有跨数据集实证规律的
+medical-FL 论文**,合适出口:MICCAI 卫星 workshop(DeCaF)/ FL workshop / MIDL short / 中端期刊(J-BHI, CMIG)。
+**不够**顶会 ML 主会(机制新颖性不足)。
+
+**把它往上抬一档的唯一低成本杠杆 = `clean_ccr` 3-seed**:
+- 若确立 adaptivity 优势 → 主线写成"自适应门控:受污染时匹配 CCR,clean 时不付 CCR 的代价" → 冲 MIDL/MICCAI 主会有戏。
+- 若不确立 → 主线写成"何时该用客户端置信度重加权?一项跨数据集实证研究" → workshop/期刊稳。
