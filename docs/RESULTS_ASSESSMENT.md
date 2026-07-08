@@ -306,10 +306,38 @@ medical-FL 论文**,合适出口:MICCAI 卫星 workshop(DeCaF)/ FL workshop / MI
 | 🟡 P2 | 关键对比补到 5-seed + 显著性检验 | 非IID 高方差, 3-seed 常不显著 | 中 |
 | 🟡 P2 | 逐标签 / 罕见病细分 | 多标签论文加分项 | 小 |
 
-### 7.3 判定
+### 7.2b 文献现实核对(2026-07-08 检索)——重要,影响定位
 
-- **现状可投**:MICCAI DeCaF / FL workshop / MedFM workshop —— 现有数据+P0 即可。
-- **要冲主会/期刊(MIDL, MICCAI, J-BHI, CMIG)**:必须补 P0 + P1(尤其 median/trimmed-mean baseline
-  与 K=8/10)。否则大概率被"baseline 不足 / 只 4 客户端 / 单一噪声模型"挡下。
-- **注意点**:(1) 不吹 agent 压过 CCR, 定位 all-rounder;(2) 最终表全部 seed-matched(曾踩坑);
-  (3) 同报 AUROC+F1 并解释校准/阈值行为;(4) 非IID 报逐 seed, 不挑好种子;(5) 放出 configs/splits/seeds 保复现。
+检索后必须诚实下调"方法新颖性":我们的核心机制(服务器端探针/验证损失给客户端打分 → 平滑降权异常/低质客户端,
+异质噪声下获益)**已有多篇近作几乎相同**:
+
+| 相关工作 | 与我们的重合度 | 出处/年份 |
+|---|---|---|
+| **FedOUI**(探针 batch 打分 → 平滑降权"非典型"客户端, 非IID+噪声, 对比 FedAvg/FedProx) | ★★★ 机制几乎相同 | arXiv 2026 |
+| **FedVG**(服务器公共验证集 → 按验证梯度范数加权客户端) | ★★★ 同思路(我们用验证 BCE) | arXiv 2026 |
+| **FedLBW**(服务器 proxy 集 loss-based 客户端加权) | ★★★ 同思路 | Expert Sys. 2025 |
+| **FedA3I**(标注质量感知聚合, 上加权高质量客户端, 异质噪声, 医疗) | ★★ 质量重加权同族 | AAAI 2024 |
+| **FedGSCA / FedClean / RHFL+**(医疗/异质标签噪声鲁棒 FL) | ★★ 同问题 | 2024–2025 |
+| **FedMLP**(多标签医疗 FL, 任务异质) | ★★ 同应用(多标签眼底) | MICCAI 2024 |
+| DataWeightedFed(ODIR 联邦, 加权聚合) | ★ 同数据集 | MDPI 2025 |
+
+**结论:作为"方法论文"新颖性很薄**——审稿人会说"这就是 FedOUI/FedVG/FedA3I 换个探针信号、换到 RETFound"。
+CCR/RHFL 已覆盖这一族,但审稿人还会点名 FedA3I/FedMLP。**agent 机制不能当卖点**。
+
+**仍然站得住的、别人没有的东西(必须转成 study/analysis 定位)**:
+1. **重加权 vs 稀释型二分 + 标签空间大小作为调节变量**(RFMiD 28类硬塌陷 ↔ ODIR 8类温和)——跨数据集实证规律。
+2. **静态鲁棒(Robust-FedProx)在异质噪声下反噬**。
+3. **极端非IID 标签覆盖病态 = 有机制的失败边界**(negative finding)。
+4. **FM(RETFound)+LoRA 联邦 + 异质标签噪声 + 多标签**的系统评测(组合较新)。
+
+### 7.3 判定(文献核对后, 已下调)
+
+- **必须换定位**:从"方法论文"→ **"实证研究 / benchmark 论文"**(卖点 = 7.2b 的 4 条 study 发现,
+  不是 agent 机制)。方法机制按"代表性探针重加权(类比 FedVG/FedLBW/FedOUI)"如实描述, 不宣称原创。
+- **现实可投**:**workshop(MICCAI DeCaF / MedFM / FL workshop)** 作为实证研究——现有数据 + P0(补 F1 全表、
+  加 median/trimmed-mean baseline、正文引用并对比 FedA3I/FedMLP 一类)即可。
+- **冲主会/期刊(MIDL/MICCAI/J-BHI)**:除 P0+P1 外, **还需与至少 1 个 SOTA 质量重加权方法(FedA3I 或复现
+  FedOUI/FedVG)直接对比**, 否则"新颖性不足 + baseline 不全"双杀。即便如此, 因机制非原创, 命中率仍偏低。
+- **顶会 ML**:❌。
+- **注意点**:(1) 不吹 agent 原创/压过 CCR;(2) 必须综述并对比 FedOUI/FedVG/FedA3I/FedMLP;
+  (3) 最终表全部 seed-matched;(4) 同报 AUROC+F1;(5) 非IID 报逐 seed;(6) 放出 configs/splits/seeds。
