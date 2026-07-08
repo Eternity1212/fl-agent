@@ -265,9 +265,13 @@ clean/het02/het04/het04_dir)将**全部 3 seed**;τ / floor 强度 / a=0.5 为�
   2. **静态鲁棒反噬**:Robust-FedProx 在异质噪声下反而最差 → 需要自适应。
   3. **系统 benchmark**:RETFound+LoRA 联邦 + 异质标签噪声 + IID/非IID + 多 seed + 同类 baseline(CCR)。
   4. **失败边界诚实刻画**:标签覆盖病态 = 开放问题。
-- **待定的关键 claim(决定成败)**:⏳ **自适应零代价 vs CCR 的 clean 代价**。若 `clean_ccr` 掉点而
-  agent 不掉 → agent 相对固定重加权有**唯一的、可辩护的设计优势**(adaptivity),论文从"实证研究"
-  升级为"有设计贡献的方法论文"。若 clean_ccr 不掉 → agent 只是重加权家族一员。
+- **已解决的关键 claim(clean_ccr 3-seed 到位, 中间剧本)**:clean 三方法——
+  agent auroc 0.8421 / F1 0.7036;fedavg 0.8482 / 0.6810;**ccr 0.8386 / 0.6933**。
+  → CCR 有"clean 代价"但**小**:两指标上 CCR 都是自适应/重加权里较低的一个(auroc 全场最低、
+  F1 低于 agent 0.01),方向支持"恒集中丢多样性",但非戏剧性崩塌(均在 ~1 std)。
+  **结论:adaptivity 是次要支撑点,不是压倒性卖点。** agent 的真正定位 = **全 regime 最佳 all-rounder**:
+  clean 上 micro-F1 最高、受污染 IID 匹配 CCR、非IID 属恢复家族——**没有任何单场景明显输**,而 CCR clean 略低、
+  robust 噪声反噬、fedavg 噪声崩。这是"跨 regime Pareto 稳健"的诚实主线。
 
 ### 6.3 能否支撑论文:结论
 
