@@ -48,3 +48,5 @@ runs:
   - { name: het04_ccr_s0,   agent_aggregation: ccr,   seed: 0 }
   - { name: het04_floor_s0, agent_aggregation: agent, agent_weight_floor: 0.5, seed: 0 }
   - { name: het04_agentmu_floor_s0, agent_aggregation: agent, agent_adaptive_mu: true, agent_weight_floor: 0.5, seed: 0 }
+  # FedA3I baseline (quality-aware aggregation via client-side loss GMM)
+  - { name: het04_feda3i_s0, agent_aggregation: feda3i, seed: 0 }

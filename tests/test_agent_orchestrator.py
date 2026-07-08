@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import numpy as np
+
 from fed_agent.agent.orchestrator import (
     decide_client_mu,
     decide_weights,
     decide_weights_ccr,
+    decide_weights_feda3i,
 )
 
 
@@ -75,3 +78,24 @@ def test_ccr_reweights_by_confidence():
     assert d.weights[0] == max(d.weights)
     # noisy clients still get less mass than clean ones
     assert (d.weights[0] + d.weights[1]) > (d.weights[2] + d.weights[3])
+
+
+def test_feda3i_downweights_noisy_by_loss_quality():
+    # Clean clients: losses tightly low. Noisy clients: a high-loss cluster mixed
+    # in -> GMM clean fraction lower -> quality*size weight lower.
+    rng = np.random.default_rng(0)
+    clean = list(rng.normal(0.1, 0.02, size=200))
+    noisy = list(rng.normal(0.1, 0.02, size=120)) + list(rng.normal(1.2, 0.1, size=80))
+    d = decide_weights_feda3i(
+        per_client_losses=[clean, clean, noisy, noisy],
+        sizes=[100, 100, 100, 100],
+    )
+    assert abs(sum(d.weights) - 1.0) < 1e-9
+    clean_mass = d.weights[0] + d.weights[1]
+    noisy_mass = d.weights[2] + d.weights[3]
+    assert clean_mass > noisy_mass, (clean_mass, noisy_mass)
+
+
+def test_feda3i_empty():
+    d = decide_weights_feda3i(per_client_losses=[], sizes=[])
+    assert d.weights == []

@@ -94,6 +94,17 @@ runs:
   - { name: het04_ccr_s2, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
 
   # ===========================================================================
+  # B2. FedA3I baseline (标注质量感知聚合, AAAI'24) —— SOTA 同类对照, 各 3 seed
+  #     客户端侧 per-sample loss 的 GMM 质量因子 -> size*quality 加权。
+  # ===========================================================================
+  - { name: het02_feda3i_s0, agent_aggregation: feda3i, agent_client_noise: 0.2, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het02_feda3i_s1, agent_aggregation: feda3i, agent_client_noise: 0.2, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het02_feda3i_s2, agent_aggregation: feda3i, agent_client_noise: 0.2, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04_feda3i_s0, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_feda3i_s1, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_feda3i_s2, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+
+  # ===========================================================================
   # C. 非IID (Dirichlet a=0.1) 短板修复: weight_floor 防门控塌陷
   # ===========================================================================
   # --- 基线补 seed (s0 也在此重跑, 保证非IID 四方法 seed-matched 到同一目录) ---
@@ -117,6 +128,10 @@ runs:
   - { name: het04_dir_ccr_s0, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
   - { name: het04_dir_ccr_s1, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
   - { name: het04_dir_ccr_s2, agent_aggregation: ccr, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  # --- FedA3I 在非IID 下的表现 (SOTA 同类对照, 3 seed) ---
+  - { name: het04_dir_feda3i_s0, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_feda3i_s1, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_feda3i_s2, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
 
   # ===========================================================================
   # D. 温和非IID (Dirichlet a=0.5): floor 是否更平滑 (seed 0)

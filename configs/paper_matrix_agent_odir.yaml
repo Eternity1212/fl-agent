@@ -84,6 +84,9 @@ runs:
   - { name: het04_agent_s0,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__iid_K4_S0.json }
   - { name: het04_agent_s1,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__iid_K4_S1.json }
   - { name: het04_agent_s2,  agent_aggregation: agent, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__iid_K4_S2.json }
+  - { name: het04_feda3i_s0, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__iid_K4_S0.json }
+  - { name: het04_feda3i_s1, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__iid_K4_S1.json }
+  - { name: het04_feda3i_s2, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__iid_K4_S2.json }
 
   # ---- het04 非IID (Dirichlet a=0.1 + 噪声0.4): fedavg / ccr / agent / floor × 3 seed ----
   - { name: het04_dir_fedavg_s0, agent_aggregation: size,  agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S0.json }
@@ -98,3 +101,6 @@ runs:
   - { name: het04_dir_floor_s0,  agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S0.json }
   - { name: het04_dir_floor_s1,  agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S1.json }
   - { name: het04_dir_floor_s2,  agent_aggregation: agent, agent_weight_floor: 0.5, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04_dir_feda3i_s0, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 0, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_feda3i_s1, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 1, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_feda3i_s2, agent_aggregation: feda3i, agent_client_noise: 0.4, seed: 2, split_json: configs/splits/generated_odir/labels__dirichlet_a0p1_K4_S2.json }

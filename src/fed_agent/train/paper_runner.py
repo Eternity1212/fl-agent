@@ -46,7 +46,8 @@ class PaperRunConfig:
     persistent_workers: bool = False
     use_data_parallel: bool = False
     # --- agent (adaptive orchestration) options ---
-    agent_aggregation: str = "agent"  # "agent" | "size" (FedAvg) | "ccr" (RHFL baseline)
+    # "agent" | "size" (FedAvg) | "ccr" (RHFL) | "feda3i" (FedA3I quality-aware)
+    agent_aggregation: str = "agent"
     agent_tau: float = 0.05
     agent_ccr_temp: float = 0.05  # softmax temperature for the CCR baseline
     agent_weight_floor: float = 0.0  # min gate fraction (anti-collapse under non-IID)
@@ -396,6 +397,7 @@ def _run_agent_federated(
         decide_client_mu,
         decide_weights,
         decide_weights_ccr,
+        decide_weights_feda3i,
     )
 
     split = read_split_json(split_json)
@@ -408,6 +410,7 @@ def _run_agent_federated(
     need_scores = (
         cfg.agent_aggregation in ("agent", "ccr") or bool(cfg.agent_adaptive_mu)
     )
+    need_feda3i = cfg.agent_aggregation == "feda3i"
     round_losses: list[float] = []
     upload_bytes: list[int] = []
     weight_history: list[dict[str, float]] = []
@@ -419,6 +422,7 @@ def _run_agent_federated(
         sizes: list[float] = []
         cks: list[str] = []
         losses = []
+        per_client_losses: list[list[float]] = []
         global_vec = (
             torch.nn.utils.parameters_to_vector(list(_unwrap_model(model).parameters()))
             .detach()
@@ -460,6 +464,17 @@ def _run_agent_federated(
             sizes.append(float(len(idxs)))
             cks.append(ck)
             losses.append(loss)
+            if need_feda3i:
+                # FedA3I quality signal: per-sample BCE of the just-trained local
+                # model on this client's own data (clean stored labels). A noisier
+                # client fits worse -> higher/wider loss -> lower GMM clean fraction.
+                y, p = _predict(model, loader, device=cfg.device)
+                eps = 1e-7
+                pc = np.clip(p, eps, 1.0 - eps)
+                per_sample = -np.mean(
+                    y * np.log(pc) + (1.0 - y) * np.log(1.0 - pc), axis=1
+                )
+                per_client_losses.append([float(v) for v in per_sample])
         mu_history.append({ck: float(cur_mu.get(ck, 0.0)) for ck in cks})
 
         probe_scores: list[float] = []
@@ -490,6 +505,12 @@ def _run_agent_federated(
                 probe_scores=probe_scores,
                 sizes=sizes,
                 temp=float(cfg.agent_ccr_temp),
+            )
+            weights = decision.weights
+        elif cfg.agent_aggregation == "feda3i":
+            decision = decide_weights_feda3i(
+                per_client_losses=per_client_losses,
+                sizes=sizes,
             )
             weights = decision.weights
         else:

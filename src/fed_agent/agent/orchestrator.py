@@ -20,6 +20,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+import numpy as np
+
 
 @dataclass(frozen=True)
 class AgentDecision:
@@ -140,6 +142,99 @@ def decide_weights_ccr(
     else:
         raw = [r / z for r in raw]
     return AgentDecision(weights=raw, probe_component=conf, geometry_component=[1.0] * n)
+
+
+def _fit_2comp_gmm_1d(
+    x: np.ndarray, iters: int = 100, tol: float = 1e-6
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """Fit a 1-D two-component Gaussian mixture by EM (numpy, no sklearn dep).
+
+    Returns (pi, mu, var) with 2 entries each, or None if degenerate. Used to
+    separate the low-loss (clean) sample cluster from the high-loss (noisy) one.
+    """
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if x.size < 4 or np.isclose(x.min(), x.max()):
+        return None
+    med = float(np.median(x))
+    lo, hi = x[x <= med], x[x > med]
+    if lo.size == 0 or hi.size == 0:
+        return None
+    mu = np.array([lo.mean(), hi.mean()], dtype=float)
+    var = np.full(2, max(float(x.var()), 1e-6))
+    pi = np.array([0.5, 0.5])
+    prev_ll = -np.inf
+    for _ in range(iters):
+        comp = np.stack(
+            [
+                pi[k]
+                * np.exp(-0.5 * (x - mu[k]) ** 2 / var[k])
+                / np.sqrt(2.0 * np.pi * var[k])
+                for k in range(2)
+            ]
+        )
+        dens = comp.sum(axis=0) + 1e-12
+        resp = comp / dens
+        nk = resp.sum(axis=1) + 1e-12
+        pi = nk / x.size
+        mu = (resp * x).sum(axis=1) / nk
+        var = np.maximum((resp * (x - mu[:, None]) ** 2).sum(axis=1) / nk, 1e-6)
+        ll = float(np.log(dens).sum())
+        if abs(ll - prev_ll) < tol:
+            break
+        prev_ll = ll
+    return pi, mu, var
+
+
+def decide_weights_feda3i(
+    *,
+    per_client_losses: list[list[float]],
+    sizes: list[float],
+) -> AgentDecision:
+    """FedA3I-style annotation-quality-aware aggregation baseline.
+
+    Reproduces the core idea of FedA3I (Wu et al., AAAI 2024): estimate each
+    client's annotation quality from the *distribution* of its per-sample losses
+    with a two-component GMM, treating the low-loss cluster as clean; the client's
+    quality factor is the estimated clean fraction (that cluster's mixing weight).
+    Aggregation weights are then quality- and size-aware:
+
+        w_i  ∝  size_i * quality_i .
+
+    This is the scalar (whole-model) form of FedA3I's quality factor; the paper's
+    additional layer-wise refinement is omitted for a lightweight baseline. Unlike
+    our server-side probe gate, the quality signal here is computed *client-side*
+    from local training losses, matching FedA3I's setting.
+    """
+    n = len(per_client_losses)
+    if n == 0:
+        return AgentDecision([], [], [])
+    if len(sizes) != n:
+        raise ValueError("sizes length must match per_client_losses")
+    quality: list[float] = []
+    for losses in per_client_losses:
+        fit = _fit_2comp_gmm_1d(np.asarray(losses, dtype=float))
+        if fit is None:
+            quality.append(1.0)
+            continue
+        pi, mu, var = fit
+        # If the two components are not well separated the loss is effectively
+        # unimodal (no distinct high-loss/noisy cluster) -> treat as fully clean.
+        sep = abs(float(mu[1] - mu[0]))
+        pooled_sd = math.sqrt(max(float(var.max()), 1e-12))
+        if sep < 2.0 * pooled_sd:
+            quality.append(1.0)
+            continue
+        clean = int(np.argmin(mu))  # lower mean loss = clean cluster
+        quality.append(float(pi[clean]))
+    raw = [sizes[i] * quality[i] for i in range(n)]
+    z = sum(raw)
+    if z <= 0:
+        zs = sum(sizes) or 1.0
+        raw = [s / zs for s in sizes]
+    else:
+        raw = [r / z for r in raw]
+    return AgentDecision(weights=raw, probe_component=quality, geometry_component=[1.0] * n)
 
 
 def decide_weights(
