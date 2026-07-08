@@ -282,3 +282,34 @@ medical-FL 论文**,合适出口:MICCAI 卫星 workshop(DeCaF)/ FL workshop / MI
 **把它往上抬一档的唯一低成本杠杆 = `clean_ccr` 3-seed**:
 - 若确立 adaptivity 优势 → 主线写成"自适应门控:受污染时匹配 CCR,clean 时不付 CCR 的代价" → 冲 MIDL/MICCAI 主会有戏。
 - 若不确立 → 主线写成"何时该用客户端置信度重加权?一项跨数据集实证研究" → workshop/期刊稳。
+
+---
+
+## 7. 投稿前充分性体检(2026-07-08)
+
+### 7.1 已有资产(够 workshop)
+
+- 2 数据集(RFMiD 28类 / ODIR 8类),3-seed,多标签。
+- 腐蚀轴:clean / p=0.2 / p=0.4(IID),Dirichlet α=0.1 非IID。
+- baseline:FedAvg、Robust-FedProx、**CCR/RHFL(同类)**;方法:agent、agent+μ;消融:τ、μ、floor。
+- 效率:LoRA 0.39% 参数、~19.6MB/轮。
+
+### 7.2 缺口(按对中稿的影响排序)
+
+| 优先级 | 缺口 | 影响 | 成本 |
+|---|---|---|---|
+| 🔴 P0 | **F1 全表补齐**(噪声列目前只报了 AUROC) | 审稿人要看阈值化指标 | 零(数据已有,重算汇总即可) |
+| 🔴 P0 | **拜占庭鲁棒 baseline**(coord-median / trimmed-mean) | "鲁棒聚合"论断缺同类对照, 现只有 CCR | 小(聚合处加一个函数) |
+| 🟠 P1 | **客户端数 K=8/10**(现仅 K=4) | FL 审稿人必问 scalability | 中(RFMiD het04 重跑一档) |
+| 🟠 P1 | **Dirichlet 扫 α=0.5/1.0 3-seed**(现 0.5 单 seed) | 非IID 结论只锚在 α=0.1 | 中 |
+| 🟠 P1 | **非对称/类相关噪声**≥1 组 | 对称翻转不够真实, 医疗标签噪声多为类相关 | 中 |
+| 🟡 P2 | 关键对比补到 5-seed + 显著性检验 | 非IID 高方差, 3-seed 常不显著 | 中 |
+| 🟡 P2 | 逐标签 / 罕见病细分 | 多标签论文加分项 | 小 |
+
+### 7.3 判定
+
+- **现状可投**:MICCAI DeCaF / FL workshop / MedFM workshop —— 现有数据+P0 即可。
+- **要冲主会/期刊(MIDL, MICCAI, J-BHI, CMIG)**:必须补 P0 + P1(尤其 median/trimmed-mean baseline
+  与 K=8/10)。否则大概率被"baseline 不足 / 只 4 客户端 / 单一噪声模型"挡下。
+- **注意点**:(1) 不吹 agent 压过 CCR, 定位 all-rounder;(2) 最终表全部 seed-matched(曾踩坑);
+  (3) 同报 AUROC+F1 并解释校准/阈值行为;(4) 非IID 报逐 seed, 不挑好种子;(5) 放出 configs/splits/seeds 保复现。
