@@ -300,6 +300,7 @@ medical-FL 论文**,合适出口:MICCAI 卫星 workshop(DeCaF)/ FL workshop / MI
 |---|---|---|---|
 | 🔴 P0 | **F1 全表补齐**(噪声列目前只报了 AUROC) | 审稿人要看阈值化指标 | 零(数据已有,重算汇总即可) |
 | 🔴 P0 | **拜占庭鲁棒 baseline**(coord-median / trimmed-mean) | "鲁棒聚合"论断缺同类对照, 现只有 CCR | 小(聚合处加一个函数) |
+| 🟠 P1 | **FedNoRo baseline**(联邦噪声分类 SOTA, 与我们任务最贴切) | 比 FedA3I 更该比; 冲主会几乎必需 | 中 |
 | 🟠 P1 | **客户端数 K=8/10**(现仅 K=4) | FL 审稿人必问 scalability | 中(RFMiD het04 重跑一档) |
 | 🟠 P1 | **Dirichlet 扫 α=0.5/1.0 3-seed**(现 0.5 单 seed) | 非IID 结论只锚在 α=0.1 | 中 |
 | 🟠 P1 | **非对称/类相关噪声**≥1 组 | 对称翻转不够真实, 医疗标签噪声多为类相关 | 中 |
@@ -316,7 +317,8 @@ medical-FL 论文**,合适出口:MICCAI 卫星 workshop(DeCaF)/ FL workshop / MI
 | **FedOUI**(探针 batch 打分 → 平滑降权"非典型"客户端, 非IID+噪声, 对比 FedAvg/FedProx) | ★★★ 机制几乎相同 | arXiv 2026 |
 | **FedVG**(服务器公共验证集 → 按验证梯度范数加权客户端) | ★★★ 同思路(我们用验证 BCE) | arXiv 2026 |
 | **FedLBW**(服务器 proxy 集 loss-based 客户端加权) | ★★★ 同思路 | Expert Sys. 2025 |
-| **FedA3I**(标注质量感知聚合, 上加权高质量客户端, 异质噪声, 医疗) | ★★ 质量重加权同族 | AAAI 2024 |
+| **FedNoRo**(FedA3I 的**分类版前身**: 联邦噪声分类, GMM 质量+distill) | ★★★ 与我们任务(分类)最贴切, 比 FedA3I 更该比 | IJCAI 2023 |
+| **FedA3I**(标注质量感知聚合, 上加权高质量客户端, 异质噪声, 医疗**分割**) | ★★ 质量重加权同族(原任务是分割, 非分类) | AAAI 2024 |
 | **FedGSCA / FedClean / RHFL+**(医疗/异质标签噪声鲁棒 FL) | ★★ 同问题 | 2024–2025 |
 | **FedMLP**(多标签医疗 FL, 任务异质) | ★★ 同应用(多标签眼底) | MICCAI 2024 |
 | DataWeightedFed(ODIR 联邦, 加权聚合) | ★ 同数据集 | MDPI 2025 |
