@@ -1,0 +1,92 @@
+version: paper_matrix.v1
+
+# =============================================================================
+# Scale / robust-baseline 补充矩阵 (GPU) —— 补两块缺口:
+#   (1) 拜占庭鲁棒聚合基线 median / trimmed-mean (Yin et al., ICML'18)
+#       —— 论文核心词是"鲁棒聚合", 必须有经典同类对照, 现在只有 CCR。
+#   (2) 客户端规模 K=8 (现主矩阵只有 K=4/5) —— FL 审稿人必问 scalability;
+#       验证"稀释崩溃 vs 重加权恢复"这个现象在更多客户端下是否成立。
+#
+# 公平性: median/trimmed 与其它方法在完全相同的异质噪声下比较。
+#   - K=4: 4 客户端, 客户端 2/3 脏 (与主矩阵/补充矩阵一致)
+#   - K=8: 8 客户端, 客户端 4/5/6/7 脏 (保持 50% 脏客户端比例, 稀释 regime 不变)
+#
+# 运行 (推荐 ./run_scale.sh, 自动下载数据 + 生成 K4/K8 split + 跑矩阵 + 汇总):
+#   python3 -m fed_agent.tools.run_paper_matrix \
+#     --matrix_yaml configs/paper_matrix_agent_scale.yaml \
+#     --out_dir runs/paper_matrix/agent_scale
+#
+# 断点续跑: 每个 run 单独存盘, 中断重跑自动跳过已完成 run。
+# =============================================================================
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  eval_labels_csv: data/raw/rfmid_full/test/labels.csv
+  eval_images_dir: data/raw/rfmid_full/test/images
+  probe_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  probe_images_dir: data/raw/rfmid_full/validation/images
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+defaults:
+  method: agent_fed
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 20
+  rounds: 40
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.0
+  device: cuda
+  require_retfound: true
+  loss: balanced_bce
+  positive_dropout: 0.0
+  train_label_noise: 0.0
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  use_data_parallel: true
+  agent_aggregation: agent
+  agent_tau: 0.03
+  agent_noisy_clients: [2, 3]
+  agent_client_noise: 0.4
+
+runs:
+  # ===========================================================================
+  # A. 拜占庭鲁棒聚合基线 (K=4), het04 IID + het04_dir(非IID a=0.1)
+  #    - median: 坐标中位数聚合, 3 seed (进主对照表)
+  #    - trimmed: 坐标截尾均值 (trim 0.25), seed0 作为鲁棒变体旁证
+  # ===========================================================================
+  # --- median @ het04 IID ---
+  - { name: het04_median_s0, agent_aggregation: median, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_median_s1, agent_aggregation: median, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04_median_s2, agent_aggregation: median, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  # --- median @ het04_dir (非IID a=0.1): 关键 —— 看它能否像 agent/floor 一样从稀释崩溃里恢复 ---
+  - { name: het04_dir_median_s0, agent_aggregation: median, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04_dir_median_s1, agent_aggregation: median, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04_dir_median_s2, agent_aggregation: median, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  # --- trimmed-mean (旁证, seed0) ---
+  - { name: het04_trimmed_s0,     agent_aggregation: trimmed, agent_trim_ratio: 0.25, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04_dir_trimmed_s0, agent_aggregation: trimmed, agent_trim_ratio: 0.25, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+
+  # ===========================================================================
+  # B. K=8 scalability (seed0 判决性): 8 客户端, 4~7 脏 (50% 脏, 稀释 regime 同 K=4)
+  #    核心 5 方法各 1 seed, 先看现象是否随规模成立; 成立再补 seed1/2。
+  # ===========================================================================
+  # --- K=8 het04 IID ---
+  - { name: het04_k8_fedavg_s0, agent_aggregation: size,   agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__iid_K8_S0.json }
+  - { name: het04_k8_agent_s0,  agent_aggregation: agent,  agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__iid_K8_S0.json }
+  - { name: het04_k8_ccr_s0,    agent_aggregation: ccr,    agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__iid_K8_S0.json }
+  - { name: het04_k8_feda3i_s0, agent_aggregation: feda3i, agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__iid_K8_S0.json }
+  - { name: het04_k8_median_s0, agent_aggregation: median, agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__iid_K8_S0.json }
+  # --- K=8 het04_dir (非IID a=0.1): 稀释崩溃最该复现的地方 ---
+  - { name: het04_dir_k8_fedavg_s0, agent_aggregation: size,   agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S0.json }
+  - { name: het04_dir_k8_agent_s0,  agent_aggregation: agent,  agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S0.json }
+  - { name: het04_dir_k8_ccr_s0,    agent_aggregation: ccr,    agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S0.json }
+  - { name: het04_dir_k8_feda3i_s0, agent_aggregation: feda3i, agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S0.json }
+  - { name: het04_dir_k8_median_s0, agent_aggregation: median, agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S0.json }

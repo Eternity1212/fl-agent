@@ -24,6 +24,8 @@ KNOWN_METHODS = [
     "robust",
     "ccr",
     "feda3i",
+    "median",
+    "trimmed",
     "muonly",
     "agentmu",
     "agent",
@@ -94,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         print(header)
         print("-" * len(header))
         # stable display order: baselines first, then agent variants, then others
-        order = ["fedavg", "robust", "ccr", "feda3i", "muonly", "agent", "agentmu",
+        order = ["fedavg", "robust", "ccr", "feda3i", "median", "trimmed", "muonly", "agent", "agentmu",
                  "agent+floor03", "agent+floor", "agentmu+floor"]
         methods_here = [m for (c, m) in buckets if c == cond]
         ordered = [m for m in order if m in methods_here]

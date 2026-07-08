@@ -14,7 +14,11 @@ from torch.utils.data import DataLoader, Subset
 
 from fed_agent.data.rfmid import load_rfmid_label_table
 from fed_agent.data.rfmid_torch import RFMiDTorchDataset
-from fed_agent.fed.aggregators import fedavg_state_dict
+from fed_agent.fed.aggregators import (
+    coordinate_median_state_dict,
+    fedavg_state_dict,
+    trimmed_mean_state_dict,
+)
 from fed_agent.fed.simulator import TinyCNN, TinyMLP
 from fed_agent.metrics.multilabel import multilabel_classification_metrics
 from fed_agent.models.retfound_lora import ModelBuildInfo, build_retfound_lora_model
@@ -47,9 +51,11 @@ class PaperRunConfig:
     use_data_parallel: bool = False
     # --- agent (adaptive orchestration) options ---
     # "agent" | "size" (FedAvg) | "ccr" (RHFL) | "feda3i" (FedA3I quality-aware)
+    #   | "median" (coord-median) | "trimmed" (trimmed-mean) — Byzantine-robust
     agent_aggregation: str = "agent"
     agent_tau: float = 0.05
     agent_ccr_temp: float = 0.05  # softmax temperature for the CCR baseline
+    agent_trim_ratio: float = 0.25  # fraction trimmed each side for "trimmed"
     agent_weight_floor: float = 0.0  # min gate fraction (anti-collapse under non-IID)
     agent_geometry: bool = False
     agent_noisy_clients: tuple[int, ...] = ()  # client ids that get label noise
@@ -492,33 +498,47 @@ def _run_agent_federated(
             probe_history.append({ck: float(s) for ck, s in zip(cks, probe_scores)})
             prev_scores = {ck: float(s) for ck, s in zip(cks, probe_scores)}
 
-        if cfg.agent_aggregation == "agent":
-            decision = decide_weights(
-                probe_scores=probe_scores,
-                sizes=sizes,
-                tau=float(cfg.agent_tau),
-                weight_floor=float(cfg.agent_weight_floor),
+        if cfg.agent_aggregation == "median":
+            # Coordinate-wise median: equal implicit weight per client.
+            weights = [1.0 for _ in local_sds]
+            weight_history.append({ck: float(w) for ck, w in zip(cks, weights)})
+            global_sd = coordinate_median_state_dict(local_sds)
+            _load_state_dict(model, global_sd)
+        elif cfg.agent_aggregation == "trimmed":
+            weights = [1.0 for _ in local_sds]
+            weight_history.append({ck: float(w) for ck, w in zip(cks, weights)})
+            global_sd = trimmed_mean_state_dict(
+                local_sds, trim_ratio=float(cfg.agent_trim_ratio)
             )
-            weights = decision.weights
-        elif cfg.agent_aggregation == "ccr":
-            decision = decide_weights_ccr(
-                probe_scores=probe_scores,
-                sizes=sizes,
-                temp=float(cfg.agent_ccr_temp),
-            )
-            weights = decision.weights
-        elif cfg.agent_aggregation == "feda3i":
-            decision = decide_weights_feda3i(
-                per_client_losses=per_client_losses,
-                sizes=sizes,
-            )
-            weights = decision.weights
+            _load_state_dict(model, global_sd)
         else:
-            weights = list(sizes)
+            if cfg.agent_aggregation == "agent":
+                decision = decide_weights(
+                    probe_scores=probe_scores,
+                    sizes=sizes,
+                    tau=float(cfg.agent_tau),
+                    weight_floor=float(cfg.agent_weight_floor),
+                )
+                weights = decision.weights
+            elif cfg.agent_aggregation == "ccr":
+                decision = decide_weights_ccr(
+                    probe_scores=probe_scores,
+                    sizes=sizes,
+                    temp=float(cfg.agent_ccr_temp),
+                )
+                weights = decision.weights
+            elif cfg.agent_aggregation == "feda3i":
+                decision = decide_weights_feda3i(
+                    per_client_losses=per_client_losses,
+                    sizes=sizes,
+                )
+                weights = decision.weights
+            else:
+                weights = list(sizes)
 
-        weight_history.append({ck: float(w) for ck, w in zip(cks, weights)})
-        global_sd = fedavg_state_dict(local_sds, weights)
-        _load_state_dict(model, global_sd)
+            weight_history.append({ck: float(w) for ck, w in zip(cks, weights)})
+            global_sd = fedavg_state_dict(local_sds, weights)
+            _load_state_dict(model, global_sd)
         round_losses.append(float(sum(losses) / max(len(losses), 1)))
         upload_bytes.append(_trainable_nbytes(model) * len(local_sds))
 
