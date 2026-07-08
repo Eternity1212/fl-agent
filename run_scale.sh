@@ -86,7 +86,7 @@ run_matrix() {
     exit 1
   }
   echo "==================================================================="
-  echo " 跑 scale 矩阵 (18 run) -> ${OUT}"
+  echo " 跑 scale 矩阵 (26 run) -> ${OUT}"
   echo "==================================================================="
   python3 -m fed_agent.tools.run_paper_matrix \
     --matrix_yaml "${MATRIX}" \

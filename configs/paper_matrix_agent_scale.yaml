@@ -90,3 +90,20 @@ runs:
   - { name: het04_dir_k8_ccr_s0,    agent_aggregation: ccr,    agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S0.json }
   - { name: het04_dir_k8_feda3i_s0, agent_aggregation: feda3i, agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S0.json }
   - { name: het04_dir_k8_median_s0, agent_aggregation: median, agent_noisy_clients: [4, 5, 6, 7], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S0.json }
+
+  # ===========================================================================
+  # C. 鲁棒聚合 "规格内 vs 超规格" 击穿点对照 (关键公平性!)
+  #    median/trimmed 理论容错 < 50% 拜占庭客户端 (n>=2f+1)。主设定是 50% 脏
+  #    (2/4), 正好在/超过击穿点 -> median 崩是"用超规格", 不能当"鲁棒聚合无效"。
+  #    这里加 25% 脏客户端(仅客户端3脏, flip 仍 0.4)对照:
+  #      - 若 median 在 25% 正常、50% 崩 -> 干净的"击穿点跨越"叙事(攻不破)
+  #      - fedavg/agent 同条件锚点, 证明现象是聚合规则问题而非数据问题
+  # ===========================================================================
+  - { name: het04lo_fedavg_s0,  agent_aggregation: size,    agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04lo_agent_s0,   agent_aggregation: agent,   agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04lo_median_s0,  agent_aggregation: median,  agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04lo_trimmed_s0, agent_aggregation: trimmed, agent_trim_ratio: 0.25, agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04lo_dir_fedavg_s0,  agent_aggregation: size,    agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04lo_dir_agent_s0,   agent_aggregation: agent,   agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04lo_dir_median_s0,  agent_aggregation: median,  agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04lo_dir_trimmed_s0, agent_aggregation: trimmed, agent_trim_ratio: 0.25, agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
