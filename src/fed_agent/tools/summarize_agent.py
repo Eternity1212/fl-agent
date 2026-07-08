@@ -57,6 +57,12 @@ def _agg(xs: list[float]) -> str:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Summarize agent matrix results.")
     p.add_argument("summary", type=Path)
+    p.add_argument(
+        "--csv",
+        type=Path,
+        default=None,
+        help="也导出一份 condition,method,seeds,<metric>_mean,<metric>_std 的完整 CSV(可直接贴论文表)",
+    )
     args = p.parse_args(argv)
 
     data = json.loads(Path(args.summary).read_text(encoding="utf-8"))
@@ -115,6 +121,29 @@ def main(argv: list[str] | None = None) -> int:
                     verdict = "loses"
                 print(f">>> {variant} vs fedavg macro_auroc delta = {delta:+.4f}  [{verdict}]")
         print()
+
+    if args.csv is not None:
+        import csv as _csv
+
+        cols = ["condition", "method", "seeds"]
+        for m in METRICS:
+            cols += [f"{m}_mean", f"{m}_std"]
+        with Path(args.csv).open("w", newline="", encoding="utf-8") as fh:
+            w = _csv.writer(fh)
+            w.writerow(cols)
+            for (cond, method) in sorted(buckets):
+                b = buckets[(cond, method)]
+                nseed = max((len(b[m]) for m in METRICS), default=0)
+                row = [cond, method, nseed]
+                for m in METRICS:
+                    xs = [x for x in b[m] if x is not None]
+                    if xs:
+                        row += [f"{mean(xs):.4f}",
+                                f"{(pstdev(xs) if len(xs) > 1 else 0.0):.4f}"]
+                    else:
+                        row += ["", ""]
+                w.writerow(row)
+        print(f"Wrote full-metric CSV: {args.csv}")
     return 0
 
 
