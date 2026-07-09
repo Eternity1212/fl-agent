@@ -77,10 +77,23 @@ against single-dataset claims of aggregator superiority.
 
 ### Table R2 — Coordinate-median across corruption fraction (RFMiD het04, K=4), macro-AUROC
 
+IID (het04):
+
 | Corruption | median | trimmed-mean | FedAvg (anchor) | Agent (anchor) |
 |---|---|---|---|---|
 | 25% noisy (1/4, within spec) | `[[het04lo_median]]` | `[[het04lo_trimmed]]` | `[[het04lo_fedavg]]` | `[[het04lo_agent]]` |
-| 50% noisy (2/4, at/over bound) | 0.5423 ± 0.0684 (2-seed) | `[[het04_trimmed]]` | `[[het04_fedavg]]` | `[[het04_agent]]` |
+| 50% noisy (2/4, at/over bound) | **0.5429 ± 0.0559** (3-seed) | 0.6937 (s0) | `[[het04_fedavg]]` | `[[het04_agent]]` |
+
+non-IID (het04_dir, a=0.1):
+
+| Corruption | median | trimmed-mean |
+|---|---|---|
+| 25% noisy (within spec) | `[[het04lo_dir_median]]` | `[[het04lo_dir_trimmed]]` |
+| 50% noisy (at/over bound) | **0.4899 ± 0.0581** (3-seed) | 0.5487 (s0) |
+
+> 观察(50% 行,已定稿): median 在 IID/non-IID、K=4/K=8 全部 ≈随机(0.41–0.54)。trimmed 略好
+> (het04 AUROC 0.69 保留)但 **F1 仍塌**(~0.09) → "梯度式失败:median 灾难,trimmed 次之"。
+> **25% 行(het04lo_*)仍待出**,是区分"击穿点越界"(Branch A)vs"本质不适配"(Branch B)的唯一实验。
 
 **两分支写法(先备好,看 `het04lo_median` 结果二选一):**
 
@@ -131,15 +144,26 @@ reweighting recovers — but recovery is **method- and regime-specific**.
 
 ## R.4 Scalability to K=8 (现象是否随规模成立)
 
-Report het04 IID + het04_dir at K=8 (4/8 noisy, same 50% fraction) for
-{FedAvg, Agent, CCR, FedA3I, median}, seed 0 decisive. **Expectation:** the
-dilution-collapse-vs-recovery pattern persists at larger K; median still fails
-(4/8 = 50% again beyond breakdown). If the pattern holds, it upgrades the claim
-from "K=4 observation" to "scale-consistent phenomenon".
+K=8 (4/8 noisy, same 50% fraction), seed 0 — **AUROC-confirmed, pattern holds**:
 
-| Method | K=8 IID | K=8 non-IID |
-|---|---|---|
-| FedAvg / CCR / FedA3I / median / Agent | `[[k8_*]]` | `[[k8_dir_*]]` |
+| Method | K=8 IID (AUROC) | K=8 non-IID (AUROC) | 判读 |
+|---|---|---|---|
+| **Agent (ours)** | **0.7843** | **0.7290** | recovery (top) |
+| CCR | 0.7278 | 0.7151 | recovery (≈agent, marginally below) |
+| FedA3I | 0.6892 | 0.6261 | partial AUROC, **F1 collapses** (0.07/0.08) |
+| FedAvg | 0.6592 | 0.6319 | dilution-degraded |
+| median | 0.5092 | 0.4053 | collapse (50% > breakdown) |
+
+**Narrative:** the dilution-degradation-vs-recovery pattern **persists at K=8**:
+Agent and CCR remain the only methods that recover usable performance (best-micro-F1
+≈0.55–0.61), while FedA3I retains modest ranking ability (AUROC above FedAvg) but,
+unlike Agent/CCR, **fails to convert it into classification performance** (F1 ≈ FedAvg);
+median collapses. Agent is the top method but its margin over CCR is small — we
+report them as a co-leading pair rather than claiming Agent dominance.
+seed0 gives a clear go-signal; s1/s2 worth adding for {FedAvg, Agent, CCR, FedA3I}.
+
+> ⚠️ 措辞纪律: (1) FedA3I 写 "partial-AUROC / F1-collapse", **不写 "崩"**(AUROC 高于 FedAvg);
+> (2) Agent vs CCR 写 "co-leading, Agent marginally ahead", **不写 "significantly outperforms"**。
 
 ---
 
