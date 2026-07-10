@@ -59,12 +59,14 @@ prep_data() {
   done
 
   echo "==================================================================="
-  echo " 生成 K=8 split (seed 0) —— scalability 用"
+  echo " 生成 K=8 split (seeds 0 1 2) —— scalability + 误差棒用"
   echo "==================================================================="
-  python3 -m fed_agent.tools.build_splits \
-    --labels_csv "${DATA_DIR}/train/labels.csv" \
-    --out_dir configs/splits/generated \
-    --seed 0 --n_clients 8 --alphas 0.1 0.5 1.0
+  for seed in 0 1 2; do
+    python3 -m fed_agent.tools.build_splits \
+      --labels_csv "${DATA_DIR}/train/labels.csv" \
+      --out_dir configs/splits/generated \
+      --seed "${seed}" --n_clients 8 --alphas 0.1 0.5 1.0
+  done
 }
 
 run_smoke() {

@@ -107,3 +107,50 @@ runs:
   - { name: het04lo_dir_agent_s0,   agent_aggregation: agent,   agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
   - { name: het04lo_dir_median_s0,  agent_aggregation: median,  agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
   - { name: het04lo_dir_trimmed_s0, agent_aggregation: trimmed, agent_trim_ratio: 0.25, agent_noisy_clients: [3], seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+
+  # ===========================================================================
+  # D. Seed 扩展 (bulletproof headline): het04lo 目前 seed0 单点 -> 补 s1/s2。
+  #    优先级最高的是 het04lo(_dir)_median: 它是 "双重约束 failure boundary" 头号结论。
+  #    anchors(fedavg/agent) 与 trimmed 同补, 让 R.2 每格 3-seed。
+  #    K=4 split(S1/S2)已存在, 无需额外建 split。
+  # ===========================================================================
+  - { name: het04lo_median_s1,  agent_aggregation: median,  agent_noisy_clients: [3], seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04lo_median_s2,  agent_aggregation: median,  agent_noisy_clients: [3], seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04lo_dir_median_s1, agent_aggregation: median, agent_noisy_clients: [3], seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04lo_dir_median_s2, agent_aggregation: median, agent_noisy_clients: [3], seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04lo_trimmed_s1, agent_aggregation: trimmed, agent_trim_ratio: 0.25, agent_noisy_clients: [3], seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04lo_trimmed_s2, agent_aggregation: trimmed, agent_trim_ratio: 0.25, agent_noisy_clients: [3], seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04lo_dir_trimmed_s1, agent_aggregation: trimmed, agent_trim_ratio: 0.25, agent_noisy_clients: [3], seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04lo_dir_trimmed_s2, agent_aggregation: trimmed, agent_trim_ratio: 0.25, agent_noisy_clients: [3], seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04lo_fedavg_s1,  agent_aggregation: size,  agent_noisy_clients: [3], seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04lo_fedavg_s2,  agent_aggregation: size,  agent_noisy_clients: [3], seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04lo_agent_s1,   agent_aggregation: agent, agent_noisy_clients: [3], seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04lo_agent_s2,   agent_aggregation: agent, agent_noisy_clients: [3], seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04lo_dir_fedavg_s1, agent_aggregation: size,  agent_noisy_clients: [3], seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04lo_dir_fedavg_s2, agent_aggregation: size,  agent_noisy_clients: [3], seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04lo_dir_agent_s1,  agent_aggregation: agent, agent_noisy_clients: [3], seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04lo_dir_agent_s2,  agent_aggregation: agent, agent_noisy_clients: [3], seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+
+  # ===========================================================================
+  # E. (可选, 冲会加分) K=8 补 s1/s2 出误差棒。需先建 K8 S1/S2 split:
+  #    for s in 1 2; do python3 -m fed_agent.tools.build_splits \
+  #      --labels_csv data/raw/rfmid_full/train/labels.csv \
+  #      --out_dir configs/splits/generated --seed $s --n_clients 8 --alphas 0.1; done
+  #    若不想跑, 用 --only 排除这些即可(见 docs)。
+  # ===========================================================================
+  - { name: het04_k8_fedavg_s1, agent_aggregation: size,   agent_noisy_clients: [4,5,6,7], seed: 1, split_json: configs/splits/generated/labels__iid_K8_S1.json }
+  - { name: het04_k8_fedavg_s2, agent_aggregation: size,   agent_noisy_clients: [4,5,6,7], seed: 2, split_json: configs/splits/generated/labels__iid_K8_S2.json }
+  - { name: het04_k8_agent_s1,  agent_aggregation: agent,  agent_noisy_clients: [4,5,6,7], seed: 1, split_json: configs/splits/generated/labels__iid_K8_S1.json }
+  - { name: het04_k8_agent_s2,  agent_aggregation: agent,  agent_noisy_clients: [4,5,6,7], seed: 2, split_json: configs/splits/generated/labels__iid_K8_S2.json }
+  - { name: het04_k8_ccr_s1,    agent_aggregation: ccr,    agent_noisy_clients: [4,5,6,7], seed: 1, split_json: configs/splits/generated/labels__iid_K8_S1.json }
+  - { name: het04_k8_ccr_s2,    agent_aggregation: ccr,    agent_noisy_clients: [4,5,6,7], seed: 2, split_json: configs/splits/generated/labels__iid_K8_S2.json }
+  - { name: het04_k8_feda3i_s1, agent_aggregation: feda3i, agent_noisy_clients: [4,5,6,7], seed: 1, split_json: configs/splits/generated/labels__iid_K8_S1.json }
+  - { name: het04_k8_feda3i_s2, agent_aggregation: feda3i, agent_noisy_clients: [4,5,6,7], seed: 2, split_json: configs/splits/generated/labels__iid_K8_S2.json }
+  - { name: het04_dir_k8_fedavg_s1, agent_aggregation: size,   agent_noisy_clients: [4,5,6,7], seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S1.json }
+  - { name: het04_dir_k8_fedavg_s2, agent_aggregation: size,   agent_noisy_clients: [4,5,6,7], seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S2.json }
+  - { name: het04_dir_k8_agent_s1,  agent_aggregation: agent,  agent_noisy_clients: [4,5,6,7], seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S1.json }
+  - { name: het04_dir_k8_agent_s2,  agent_aggregation: agent,  agent_noisy_clients: [4,5,6,7], seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S2.json }
+  - { name: het04_dir_k8_ccr_s1,    agent_aggregation: ccr,    agent_noisy_clients: [4,5,6,7], seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S1.json }
+  - { name: het04_dir_k8_ccr_s2,    agent_aggregation: ccr,    agent_noisy_clients: [4,5,6,7], seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S2.json }
+  - { name: het04_dir_k8_feda3i_s1, agent_aggregation: feda3i, agent_noisy_clients: [4,5,6,7], seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S1.json }
+  - { name: het04_dir_k8_feda3i_s2, agent_aggregation: feda3i, agent_noisy_clients: [4,5,6,7], seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K8_S2.json }

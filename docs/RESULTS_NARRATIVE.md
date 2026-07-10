@@ -77,23 +77,29 @@ against single-dataset claims of aggregator superiority.
 
 ### Table R2 — Coordinate-median across corruption fraction (RFMiD het04, K=4), macro-AUROC
 
-IID (het04):
+IID (het04), macro-AUROC:
 
 | Corruption | median | trimmed-mean | FedAvg (anchor) | Agent (anchor) |
 |---|---|---|---|---|
-| 25% noisy (1/4, within spec) | `[[het04lo_median]]` | `[[het04lo_trimmed]]` | `[[het04lo_fedavg]]` | `[[het04lo_agent]]` |
+| 25% noisy (1/4, within spec) | **0.8091** (s0) | 0.8047 (s0) | 0.7665 (s0) | 0.8113 (s0) |
 | 50% noisy (2/4, at/over bound) | **0.5429 ± 0.0559** (3-seed) | 0.6937 (s0) | `[[het04_fedavg]]` | `[[het04_agent]]` |
 
-non-IID (het04_dir, a=0.1):
+non-IID (het04_dir, a=0.1), macro-AUROC:
 
-| Corruption | median | trimmed-mean |
-|---|---|---|
-| 25% noisy (within spec) | `[[het04lo_dir_median]]` | `[[het04lo_dir_trimmed]]` |
-| 50% noisy (at/over bound) | **0.4899 ± 0.0581** (3-seed) | 0.5487 (s0) |
+| Corruption | median | trimmed-mean | FedAvg (anchor) | Agent (anchor) |
+|---|---|---|---|---|
+| 25% noisy (within spec) | **0.5211** (s0, F1=0.00) | 0.7100 (s0) | 0.8068 (s0) | 0.8191 (s0) |
+| 50% noisy (at/over bound) | **0.4899 ± 0.0581** (3-seed) | 0.5487 (s0) | `[[het04_fedavg]]` | `[[het04_agent]]` |
 
-> 观察(50% 行,已定稿): median 在 IID/non-IID、K=4/K=8 全部 ≈随机(0.41–0.54)。trimmed 略好
-> (het04 AUROC 0.69 保留)但 **F1 仍塌**(~0.09) → "梯度式失败:median 灾难,trimmed 次之"。
-> **25% 行(het04lo_*)仍待出**,是区分"击穿点越界"(Branch A)vs"本质不适配"(Branch B)的唯一实验。
+> **核心发现(failure boundary,已定稿):** coordinate-median 的失败受**双重约束**:
+> - **IID**: 50%→25% 腐蚀率下降即恢复(0.54→0.81)→ 经典**击穿点越界**解释成立。
+> - **non-IID**: 即使降到 25%, median 仍崩(0.52, F1=0.00),而同条件 FedAvg 正常(0.81)
+>   → median 与 client heterogeneity 存在**额外的特异性脆弱**,非单纯腐蚀率问题。
+> - **梯度**: median(最脆)< trimmed(次之,non-IID 25% AUROC 0.71 但仍逊 fedavg/agent)< agent(最稳)。
+>
+> ⚠️ 上述 het04lo_* 目前均为 **seed0 单点**。效应极大且与 50% 的 3-seed 一致,方向可信;
+> 但作为论文**头号 failure-boundary 结论**,建议补 `het04lo_dir_median` / `het04lo_median` 的 s1/s2
+> (见 `paper_matrix_agent_scale.yaml` D 节)让这一格 bulletproof。
 
 **两分支写法(先备好,看 `het04lo_median` 结果二选一):**
 
