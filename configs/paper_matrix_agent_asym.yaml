@@ -1,0 +1,87 @@
+version: paper_matrix.v1
+
+# =============================================================================
+# 第二种噪声模型: 非对称 (class-conditional) 标签噪声 —— 冲 MICCAI 主会加分项
+# =============================================================================
+# 现主矩阵全用 symmetric flip。噪声联邦论文通常要 >=2 种噪声模型。
+# 非对称噪声模拟真实标注: "漏诊" 为主 —— 正标签(1)以 p 掉成 0(假阴),
+# 负标签(0)仅以 p*0.1 升成 1(偶发假阳)。医学上比对称翻转更真实。
+#
+# 镜像 symmetric 主对照: het04 IID + het04_dir(非IID) x {fedavg,agent,ccr,feda3i} x 3 seed。
+# 结论用法: 若"跨数据集翻转 / 失败边界 / 指标分裂"在非对称噪声下仍成立 -> 结论对噪声模型稳健。
+#
+# 运行(数据/split 已就绪时):
+#   python3 -m fed_agent.tools.run_paper_matrix \
+#     --matrix_yaml configs/paper_matrix_agent_asym.yaml \
+#     --out_dir runs/paper_matrix/agent_asym
+#   python3 -m fed_agent.tools.summarize_agent runs/paper_matrix/agent_asym/summary.json \
+#     --csv runs/paper_matrix/agent_asym/asym_full.csv
+# =============================================================================
+
+dataset:
+  train_labels_csv: data/raw/rfmid_full/train/labels.csv
+  train_images_dir: data/raw/rfmid_full/train/images
+  validation_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  validation_images_dir: data/raw/rfmid_full/validation/images
+  eval_labels_csv: data/raw/rfmid_full/test/labels.csv
+  eval_images_dir: data/raw/rfmid_full/test/images
+  probe_labels_csv: data/raw/rfmid_full/validation/labels.csv
+  probe_images_dir: data/raw/rfmid_full/validation/images
+  split_json: configs/splits/generated/labels__iid_K4_S0.json
+
+defaults:
+  method: agent_fed
+  backbone: retfound_mae_vit_large
+  image_size: [224, 224]
+  batch_size: 16
+  epochs: 20
+  rounds: 40
+  local_epochs: 1
+  lr: 0.001
+  lora_rank: 8
+  lora_alpha: 16.0
+  fedprox_mu: 0.0
+  device: cuda
+  require_retfound: true
+  loss: balanced_bce
+  positive_dropout: 0.0
+  train_label_noise: 0.0
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  use_data_parallel: true
+  agent_aggregation: agent
+  agent_tau: 0.03
+  agent_noisy_clients: [2, 3]
+  agent_client_noise: 0.4
+  agent_noise_mode: asymmetric      # <-- 关键: 全矩阵用非对称噪声
+  agent_noise_asym_ratio: 0.1
+
+runs:
+  # --- het04 IID (asymmetric) ---
+  - { name: het04asym_fedavg_s0, agent_aggregation: size,   seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04asym_fedavg_s1, agent_aggregation: size,   seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04asym_fedavg_s2, agent_aggregation: size,   seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04asym_agent_s0,  agent_aggregation: agent,  seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04asym_agent_s1,  agent_aggregation: agent,  seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04asym_agent_s2,  agent_aggregation: agent,  seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04asym_ccr_s0,    agent_aggregation: ccr,    seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04asym_ccr_s1,    agent_aggregation: ccr,    seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04asym_ccr_s2,    agent_aggregation: ccr,    seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+  - { name: het04asym_feda3i_s0, agent_aggregation: feda3i, seed: 0, split_json: configs/splits/generated/labels__iid_K4_S0.json }
+  - { name: het04asym_feda3i_s1, agent_aggregation: feda3i, seed: 1, split_json: configs/splits/generated/labels__iid_K4_S1.json }
+  - { name: het04asym_feda3i_s2, agent_aggregation: feda3i, seed: 2, split_json: configs/splits/generated/labels__iid_K4_S2.json }
+
+  # --- het04_dir non-IID (asymmetric) ---
+  - { name: het04asym_dir_fedavg_s0, agent_aggregation: size,   seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04asym_dir_fedavg_s1, agent_aggregation: size,   seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04asym_dir_fedavg_s2, agent_aggregation: size,   seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04asym_dir_agent_s0,  agent_aggregation: agent,  seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04asym_dir_agent_s1,  agent_aggregation: agent,  seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04asym_dir_agent_s2,  agent_aggregation: agent,  seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04asym_dir_ccr_s0,    agent_aggregation: ccr,    seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04asym_dir_ccr_s1,    agent_aggregation: ccr,    seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04asym_dir_ccr_s2,    agent_aggregation: ccr,    seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }
+  - { name: het04asym_dir_feda3i_s0, agent_aggregation: feda3i, seed: 0, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S0.json }
+  - { name: het04asym_dir_feda3i_s1, agent_aggregation: feda3i, seed: 1, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S1.json }
+  - { name: het04asym_dir_feda3i_s2, agent_aggregation: feda3i, seed: 2, split_json: configs/splits/generated/labels__dirichlet_a0p1_K4_S2.json }

@@ -59,7 +59,10 @@ class PaperRunConfig:
     agent_weight_floor: float = 0.0  # min gate fraction (anti-collapse under non-IID)
     agent_geometry: bool = False
     agent_noisy_clients: tuple[int, ...] = ()  # client ids that get label noise
-    agent_client_noise: float = 0.0  # symmetric flip prob for noisy clients
+    agent_client_noise: float = 0.0  # flip prob for noisy clients
+    # "symmetric" (default 0<->1) | "asymmetric" (class-conditional: drop positives)
+    agent_noise_mode: str = "symmetric"
+    agent_noise_asym_ratio: float = 0.1  # 0->1 rate = p * ratio (only for asymmetric)
     # joint adaptive orchestration: per-client proximal strength from telemetry
     agent_adaptive_mu: bool = False
     agent_mu_max: float = 0.1
@@ -143,6 +146,33 @@ def _apply_symmetric_flip(y: torch.Tensor, *, p: float, seed: int) -> torch.Tens
     return out
 
 
+def _apply_asymmetric_flip(
+    y: torch.Tensor, *, p: float, asym_ratio: float, seed: int
+) -> torch.Tensor:
+    """Class-conditional (asymmetric) label noise.
+
+    Models real annotation error where *missed findings* dominate: positive
+    labels (1) are dropped to 0 with probability ``p`` (false negatives), while
+    negatives (0) are raised to 1 only with the much smaller probability
+    ``p * asym_ratio`` (occasional false positives). ``asym_ratio=1`` recovers
+    symmetric noise; the default ``0.1`` gives a strongly asymmetric,
+    medically-realistic corruption. Deterministic given ``seed``.
+    """
+    if p <= 0.0:
+        return y
+    g = torch.Generator(device=y.device)
+    g.manual_seed(int(seed))
+    r = torch.rand(y.shape, generator=g, device=y.device)
+    pos = y > 0.5
+    p_neg = float(p) * float(asym_ratio)
+    drop_pos = pos & (r < float(p))  # 1 -> 0 (missed finding)
+    raise_neg = (~pos) & (r < p_neg)  # 0 -> 1 (false positive)
+    out = y.clone()
+    out[drop_pos] = 0.0
+    out[raise_neg] = 1.0
+    return out
+
+
 def _loss_fn(cfg: PaperRunConfig, pos_weight: torch.Tensor | None) -> nn.Module:
     if cfg.loss == "balanced_bce":
         return nn.BCEWithLogitsLoss(pos_weight=pos_weight)
@@ -213,7 +243,15 @@ def _train_model(
             x = x.to(device)
             y = y.to(device)
             if label_flip_p > 0.0:
-                y = _apply_symmetric_flip(y, p=float(label_flip_p), seed=int(round_seed))
+                if cfg.agent_noise_mode == "asymmetric":
+                    y = _apply_asymmetric_flip(
+                        y,
+                        p=float(label_flip_p),
+                        asym_ratio=float(cfg.agent_noise_asym_ratio),
+                        seed=int(round_seed),
+                    )
+                else:
+                    y = _apply_symmetric_flip(y, p=float(label_flip_p), seed=int(round_seed))
             y = _apply_positive_dropout(y, p=float(cfg.positive_dropout), seed=int(round_seed))
             opt.zero_grad()
             logits = model(x)
