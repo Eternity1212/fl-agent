@@ -84,14 +84,14 @@ IID (het04), macro-AUROC:
 | Corruption | median | trimmed-mean | FedAvg (anchor) | Agent (anchor) |
 |---|---|---|---|---|
 | 25% noisy (1/4, within spec) | **0.8096 ± 0.0097** (3-seed) | 0.8047 | 0.7665 | 0.8113 |
-| 50% noisy (2/4, at/over bound) | **0.5051 ± 0.0498** (3-seed) | 0.6937 | `[[het04_fedavg]]` | `[[het04_agent]]` |
+| 50% noisy (2/4, at/over bound) | **0.5051 ± 0.0498** (3-seed) | 0.6937 | 0.7380 ± 0.0007 | 0.8043 ± 0.0096 |
 
 non-IID (het04_dir, a=0.1), macro-AUROC:
 
 | Corruption | median | trimmed-mean | FedAvg (anchor) | Agent (anchor) |
 |---|---|---|---|---|
 | 25% noisy (within spec) | **0.5978 ± 0.1854** (3-seed, 高方差) | 0.7100 | 0.8068 | 0.8191 |
-| 50% noisy (at/over bound) | **0.4904 ± 0.0716** (3-seed) | 0.5487 | `[[het04_fedavg]]` | `[[het04_agent]]` |
+| 50% noisy (at/over bound) | **0.4904 ± 0.0716** (3-seed) | 0.5487 | 0.6475 ± 0.0546 | 0.6690 ± 0.1040 |
 
 > **核心发现(failure boundary,3-seed 已定稿):** coordinate-median 的失败受**双重约束**:
 > - **IID**: 50%→25% 腐蚀率下降即恢复(0.505→0.810, std 极小)→ 经典**击穿点越界**成立,干净。
@@ -207,10 +207,10 @@ AUROC-only or F1-only claims. → 这条把"我们被迫两个指标都看"从�
 
 ## 现状:所有占位符已用真实 3-seed 数字替换(2026-07-13)
 
-R.1a/R.1b/R.2/R.3/R.3b/R.4 均已填实。**唯一仍缺**:R.2 的 50% 行 `[[het04_fedavg]]`/`[[het04_agent]]`
-锚点(het04 IID 50% 的 fedavg/agent AUROC)——它们不在 supp/odir/scale 三份 CSV 里,在**主矩阵**
-`runs/paper_matrix/agent/`。补法:把主矩阵 het04 的 fedavg/agent json 复制进 agent_supp 后重跑
-summarize,或单独读取。非阻塞(R.2 结论已由 median/25%/50% 成立)。
+R.1a/R.1b/R.2/R.3/R.3b/R.4 均已填实。**R.2 的 50% 锚点已补齐**(读自 `runs/paper_matrix/agent_stage1/`):
+het04 IID 50% FedAvg 0.7380 ± 0.0007、Agent 0.8043 ± 0.0096(均 3-seed);het04_dir 50% 用 R.3 的
+3-seed 值 FedAvg 0.6475 ± 0.0546、Agent 0.6690 ± 0.1040。**所有占位符已清空。** 完整初稿见
+`docs/PAPER_DRAFT.md`。
 
 ## 填数指引 (GPU CSV → 表格占位符)
 
