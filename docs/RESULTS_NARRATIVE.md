@@ -81,25 +81,22 @@ IID (het04), macro-AUROC:
 
 | Corruption | median | trimmed-mean | FedAvg (anchor) | Agent (anchor) |
 |---|---|---|---|---|
-| 25% noisy (1/4, within spec) | **0.8091** (s0) | 0.8047 (s0) | 0.7665 (s0) | 0.8113 (s0) |
-| 50% noisy (2/4, at/over bound) | **0.5429 ± 0.0559** (3-seed) | 0.6937 (s0) | `[[het04_fedavg]]` | `[[het04_agent]]` |
+| 25% noisy (1/4, within spec) | **0.8096 ± 0.0097** (3-seed) | 0.8047 | 0.7665 | 0.8113 |
+| 50% noisy (2/4, at/over bound) | **0.5051 ± 0.0498** (3-seed) | 0.6937 | `[[het04_fedavg]]` | `[[het04_agent]]` |
 
 non-IID (het04_dir, a=0.1), macro-AUROC:
 
 | Corruption | median | trimmed-mean | FedAvg (anchor) | Agent (anchor) |
 |---|---|---|---|---|
-| 25% noisy (within spec) | **0.5211** (s0, F1=0.00) | 0.7100 (s0) | 0.8068 (s0) | 0.8191 (s0) |
-| 50% noisy (at/over bound) | **0.4899 ± 0.0581** (3-seed) | 0.5487 (s0) | `[[het04_fedavg]]` | `[[het04_agent]]` |
+| 25% noisy (within spec) | **0.5978 ± 0.1854** (3-seed, 高方差) | 0.7100 | 0.8068 | 0.8191 |
+| 50% noisy (at/over bound) | **0.4904 ± 0.0716** (3-seed) | 0.5487 | `[[het04_fedavg]]` | `[[het04_agent]]` |
 
-> **核心发现(failure boundary,已定稿):** coordinate-median 的失败受**双重约束**:
-> - **IID**: 50%→25% 腐蚀率下降即恢复(0.54→0.81)→ 经典**击穿点越界**解释成立。
-> - **non-IID**: 即使降到 25%, median 仍崩(0.52, F1=0.00),而同条件 FedAvg 正常(0.81)
->   → median 与 client heterogeneity 存在**额外的特异性脆弱**,非单纯腐蚀率问题。
-> - **梯度**: median(最脆)< trimmed(次之,non-IID 25% AUROC 0.71 但仍逊 fedavg/agent)< agent(最稳)。
->
-> ⚠️ 上述 het04lo_* 目前均为 **seed0 单点**。效应极大且与 50% 的 3-seed 一致,方向可信;
-> 但作为论文**头号 failure-boundary 结论**,建议补 `het04lo_dir_median` / `het04lo_median` 的 s1/s2
-> (见 `paper_matrix_agent_scale.yaml` D 节)让这一格 bulletproof。
+> **核心发现(failure boundary,3-seed 已定稿):** coordinate-median 的失败受**双重约束**:
+> - **IID**: 50%→25% 腐蚀率下降即恢复(0.505→0.810, std 极小)→ 经典**击穿点越界**成立,干净。
+> - **non-IID**: 降到 25% 也**不可靠**(0.598 ± **0.185**,跨 seed 从 ~0.4 摆到 ~0.78),同条件
+>   FedAvg 稳定 0.807 → median 与 client heterogeneity 有**额外特异性脆弱**。措辞用
+>   **"unreliable / high-variance"**,不要用"consistently fails"(3-seed 显示是高方差不是恒崩)。
+> - **梯度**: median(最脆)< trimmed(次之)< agent(最稳)。
 
 **两分支写法(先备好,看 `het04lo_median` 结果二选一):**
 
@@ -150,26 +147,27 @@ reweighting recovers — but recovery is **method- and regime-specific**.
 
 ## R.4 Scalability to K=8 (现象是否随规模成立)
 
-K=8 (4/8 noisy, same 50% fraction), seed 0 — **AUROC-confirmed, pattern holds**:
+K=8 (4/8 noisy, same 50% fraction), **3-seed (mean ± std), AUROC**:
 
-| Method | K=8 IID (AUROC) | K=8 non-IID (AUROC) | 判读 |
-|---|---|---|---|
-| **Agent (ours)** | **0.7843** | **0.7290** | recovery (top) |
-| CCR | 0.7278 | 0.7151 | recovery (≈agent, marginally below) |
-| FedA3I | 0.6892 | 0.6261 | partial AUROC, **F1 collapses** (0.07/0.08) |
-| FedAvg | 0.6592 | 0.6319 | dilution-degraded |
-| median | 0.5092 | 0.4053 | collapse (50% > breakdown) |
+| Method | K=8 IID | Δ vs FedAvg | K=8 non-IID | Δ vs FedAvg |
+|---|---|---|---|---|
+| **Agent (ours)** | **0.8040 ± 0.0092** | **+0.115** | 0.7884 ± 0.0455 | +0.033 |
+| CCR | 0.7715 ± 0.0306 | +0.082 | **0.7974 ± 0.0391** | +0.042 |
+| FedA3I | 0.6803 ± 0.0104 | −0.009 | 0.7527 ± 0.0978 | −0.003 |
+| FedAvg | 0.6895 ± 0.0054 | — | 0.7555 ± 0.0636 | — |
+| median | 0.5092 (s0) | — | 0.4053 (s0) | — |
 
-**Narrative:** the dilution-degradation-vs-recovery pattern **persists at K=8**:
-Agent and CCR remain the only methods that recover usable performance (best-micro-F1
-≈0.55–0.61), while FedA3I retains modest ranking ability (AUROC above FedAvg) but,
-unlike Agent/CCR, **fails to convert it into classification performance** (F1 ≈ FedAvg);
-median collapses. Agent is the top method but its margin over CCR is small — we
-report them as a co-leading pair rather than claiming Agent dominance.
-seed0 gives a clear go-signal; s1/s2 worth adding for {FedAvg, Agent, CCR, FedA3I}.
+**Narrative(诚实分档):**
+- **K=8 IID = 强证据**: FedAvg degrades to 0.69, Agent/CCR recover to 0.77–0.80
+  (Δ +0.08/+0.11,远大于 std)→ dilution-vs-recovery **clearly persists at scale**.
+- **K=8 non-IID = 支持但弱**: FedAvg 本身没崩(0.756,且 std 0.064 很大),Agent/CCR 只领先
+  +0.03/+0.04,**落在方差重叠区** → 只能写 "trend consistent",**不能**写 "clear recovery"。
+- **FedA3I** 两条件均 ≈ FedAvg(Δ≈0,3-seed 后不再高于 FedAvg),且 **F1 塌**(K=8 IID best-micro-F1
+  0.117 vs agent 0.60)→ 写 **"on par with FedAvg, no recovery, F1 collapse"**。
+- **Agent vs CCR**: 打平(IID agent 略高、non-IID ccr 略高)→ **co-leading pair**,不吹 agent。
 
-> ⚠️ 措辞纪律: (1) FedA3I 写 "partial-AUROC / F1-collapse", **不写 "崩"**(AUROC 高于 FedAvg);
-> (2) Agent vs CCR 写 "co-leading, Agent marginally ahead", **不写 "significantly outperforms"**。
+> ⚠️ 3-seed 后的两处更新: (1) FedA3I 从"AUROC 高于 FedAvg"改为"**≈ FedAvg**"(seed0 的领先被抹平);
+> (2) K=8 **non-IID 的 recovery 是弱证据**(方差重叠),主打 K=8 IID。
 
 ---
 
