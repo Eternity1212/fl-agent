@@ -131,6 +131,68 @@ VERDICT_COLOR = {
 }
 
 
+def fig1_overview(out: Path) -> None:
+    """Study-overview schematic: datasets -> RETFound-LoRA -> clients ->
+    noise/heterogeneity -> aggregator families -> dual-metric / failure-boundary
+    evaluation. Hand-laid boxes + arrows (no data)."""
+    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+
+    fig, ax = plt.subplots(figsize=(13.5, 5.9))
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 60)
+    ax.axis("off")
+
+    def box(x, y, w, h, title, lines, fc, tc="black"):
+        ax.add_patch(FancyBboxPatch(
+            (x, y), w, h, boxstyle="round,pad=0.6,rounding_size=1.4",
+            facecolor=fc, edgecolor="#333333", linewidth=1.4))
+        ax.text(x + w / 2, y + h - 3.4, title, ha="center", va="top",
+                fontsize=10.5, fontweight="bold", color=tc)
+        ax.text(x + w / 2, y + h - 8.2, "\n".join(lines), ha="center", va="top",
+                fontsize=8.6, color=tc)
+
+    def arrow(x1, y1, x2, y2):
+        ax.add_patch(FancyArrowPatch(
+            (x1, y1), (x2, y2), arrowstyle="-|>", mutation_scale=18,
+            color="#555555", linewidth=1.8, shrinkA=2, shrinkB=2))
+
+    y0, h = 30, 22
+    # Stage 1: datasets
+    box(1, y0, 15, h, "1. Datasets",
+        ["RFMiD", "ODIR-5K", "", "multi-label", "fundus"], "#dbe9f6")
+    # Stage 2: backbone
+    box(19, y0, 16, h, "2. Backbone",
+        ["RETFound", "(MAE ViT-L)", "+ LoRA (r=8)", "", "comm-efficient"], "#e8f4e0")
+    # Stage 3: clients
+    box(38, y0, 16, h, "3. Federated clients",
+        ["K = 4 / 8", "local LoRA train", "1 epoch/round", "40 rounds", "FedAvg comm"], "#fdf0d5")
+    # Stage 4: noise / heterogeneity
+    box(57, y0, 18, h, "4. Noise & heterogeneity",
+        ["label noise 25–50%", "sym / asym flip", "IID vs Dirichlet", "(α=0.1)", "2/4, 4/8 noisy"], "#f6dede")
+    # Stage 5: aggregator families
+    box(78, y0, 21, h, "5. Aggregation families",
+        ["FedAvg / FedProx", "median / trimmed", "FedA3I / FedNoRo", "CCR / Agent(ours)", ""], "#ece3f5")
+
+    for x1, x2 in [(16, 19), (35, 38), (54, 57), (75, 78)]:
+        arrow(x1, y0 + h / 2, x2, y0 + h / 2)
+
+    # Evaluation band (bottom), fed from stage 5
+    box(30, 3, 40, 18, "Evaluation  →  Failure-boundary analysis",
+        ["primary: macro-AUROC (ranking)   +   secondary: best-F1 (usability)",
+         "sweep corruption × heterogeneity × scale, seed-matched (n=3)",
+         "catastrophic failure := AUROC<0.55 or best-micro-F1<0.10"], "#eeeeee")
+    ax.add_patch(FancyArrowPatch(
+        (88.5, y0), (66, 21), arrowstyle="-|>", mutation_scale=18,
+        color="#555555", linewidth=1.8, connectionstyle="arc3,rad=-0.25"))
+
+    ax.text(50, 57.5,
+            "Fig. 1  Study overview: robust/quality-aware aggregation for "
+            "multi-label federated ophthalmic learning under label noise",
+            ha="center", va="center", fontsize=12.5, fontweight="bold")
+    fig.savefig(out / "fig1_overview.png", dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def fig2_failure_boundary(out: Path) -> None:
     methods = list(FAILURE)
     fig, axes = plt.subplots(1, len(methods), figsize=(13, 3.4))
@@ -263,12 +325,13 @@ def main() -> None:
     args = ap.parse_args()
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    fig1_overview(out)
     fig2_failure_boundary(out)
     fig3_scatter(out)
     fig4_rank_flip(out)
     fig5_k_scaling(out)
     fig6_conclusion_matrix(out)
-    print(f"Wrote 5 core figures + conclusion matrix to {out}/")
+    print(f"Wrote overview + 5 core figures + conclusion matrix to {out}/")
     for p in sorted(out.glob("fig*.png")):
         print("  ", p)
 

@@ -475,7 +475,13 @@ cross-dataset bar chart (§4.1), non-IID collapse/recovery (§4.3), K=8 scaling
 > 数据**的图(训练曲线、client weight 分布、per-label F1 箱线)须在 GPU 机器上从
 > `runs/paper_matrix/*/*.json` 生成,见 §9.2。
 
-### 9.1 Generated (summary-based) — ready
+### 9.1 Generated — ready
+
+**Fig. 1 — Study overview.** The task space at a glance: datasets → RETFound-LoRA
+backbone → federated clients → noise/heterogeneity → aggregation families →
+dual-metric failure-boundary evaluation.
+
+![Fig 1](figures/paper/fig1_overview.png)
 
 **Fig. 2 — Failure boundary (corruption × heterogeneity), macro-AUROC.**
 The two-dimensional boundary of §4.2: median goes red at 50% and under non-IID;
@@ -505,9 +511,6 @@ Stable / brittle / rank-flip / collapse per condition (`*` = high variance).
 
 ### 9.2 To generate on the GPU box (need raw JSONs) — TODO
 
-- **Fig. 1 — Study-overview schematic** (datasets, RETFound-LoRA, clients,
-  noise/heterogeneity, aggregator families): a hand-drawn/vector schematic
-  (draw.io / TikZ), not data-driven.
 - **Fig. 7 — Training curves** (global val metric vs round) for 2–3 representative
   settings: distinguishes *always-low* vs *late-round collapse* failure. Needs
   per-round eval logged in the run JSONs.
