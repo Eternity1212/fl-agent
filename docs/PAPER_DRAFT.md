@@ -156,9 +156,33 @@ client partitions, noise realizations, and seeds. We report mean ± std over
 
 > 中文:这段先声明"F1 抖、只用 AUROC 排名、同种子对比",挡住后面单看 F1 的质疑。
 
+### 3.5 Statistical presentation and failure definition
+
+Every reported cell is **n=3 seeds** (mean ± std) unless explicitly annotated
+otherwise (two-seed cells and single-seed points are marked). Because sample
+sizes are small, we report **effect sizes** rather than p-values: for a
+comparison we give the mean difference Δ and, where relevant, a
+standardized-mean-difference proxy `Δ / s_pooled` with
+`s_pooled = sqrt((s_A² + s_B²)/2)`; we call an effect **decisive** only when
+`|Δ| > 2·s_pooled` (roughly non-overlapping ±1σ bands) and otherwise report it as
+*trend-consistent* (e.g. the K=8 non-IID recovery, §4.4).
+
+We define **catastrophic failure** operationally: a method fails on a condition
+if its macro-AUROC `< 0.55` (near the 0.5 random floor) **or** its best-micro-F1
+`< 0.10` (predictions unusable). Under this definition coordinate-median fails on
+every 50% condition and on non-IID 25% (Table 2), and FedAvg/FedA3I suffer an
+F1-only failure on RFMiD het04_dir (Table 3a) despite non-failing AUROC — the
+metric dissociation of §4.5.
+
+> 中文:gap 4 补齐——n=3 明示、效应量 `Δ/pooled-std`、以及"灾难性失败"的硬定义
+> (AUROC<0.55 或 best-micro-F1<0.10)。审稿人问统计严谨性时直接引用本段。
+
 ---
 
 ## 4. Results
+
+> 图见文末 §9。核心图:Fig.2 失败边界热图、Fig.3 AUROC–F1 分裂散点、Fig.4 跨数据集排名翻转、
+> Fig.5 K 稀释-恢复、Fig.6 结论矩阵。
 
 ### 4.1 The competitiveness of quality-aware aggregation is dataset-dependent
 
@@ -376,3 +400,56 @@ Journal fallback: *Medical Image Analysis* / *IEEE JBHI* FL special issues.
 **Figures to render** (via `make_agent_figures`): breakdown-point curve (§4.2),
 cross-dataset bar chart (§4.1), non-IID collapse/recovery (§4.3), K=8 scaling
 (§4.4), and an AUROC-vs-F1 scatter illustrating the metric dissociation (§4.5).
+
+---
+
+## 9. Figures
+
+> 已生成(`scripts/make_core_figures.py`,用已落盘 3-seed 汇总数字)。需要**原始逐轮/逐样本
+> 数据**的图(训练曲线、client weight 分布、per-label F1 箱线)须在 GPU 机器上从
+> `runs/paper_matrix/*/*.json` 生成,见 §9.2。
+
+### 9.1 Generated (summary-based) — ready
+
+**Fig. 2 — Failure boundary (corruption × heterogeneity), macro-AUROC.**
+The two-dimensional boundary of §4.2: median goes red at 50% and under non-IID;
+Agent stays green throughout.
+
+![Fig 2](figures/paper/fig2_failure_boundary.png)
+
+**Fig. 3 — Metric dissociation: macro-AUROC vs best-micro-F1.**
+Each point is one setting×method; high AUROC does not imply high F1 (§4.5).
+
+![Fig 3](figures/paper/fig3_auroc_f1_scatter.png)
+
+**Fig. 4 — Cross-dataset rank reversal (RFMiD het02 → ODIR het04).**
+FedA3I crosses from bottom to top; the flagship result of §4.1.
+
+![Fig 4](figures/paper/fig4_rank_flip.png)
+
+**Fig. 5 — Dilution vs. recovery from K=4 to K=8.**
+FedAvg dilutes with K (IID), Agent stays flat/high, median collapses (§4.4).
+
+![Fig 5](figures/paper/fig5_k_scaling.png)
+
+**Fig. 6 — Conclusion matrix (method × condition qualitative verdict).**
+Stable / brittle / rank-flip / collapse per condition (`*` = high variance).
+
+![Fig 6](figures/paper/fig6_conclusion_matrix.png)
+
+### 9.2 To generate on the GPU box (need raw JSONs) — TODO
+
+- **Fig. 1 — Study-overview schematic** (datasets, RETFound-LoRA, clients,
+  noise/heterogeneity, aggregator families): a hand-drawn/vector schematic
+  (draw.io / TikZ), not data-driven.
+- **Fig. 7 — Training curves** (global val metric vs round) for 2–3 representative
+  settings: distinguishes *always-low* vs *late-round collapse* failure. Needs
+  per-round eval logged in the run JSONs.
+- **Fig. 8 — Client weight / score distributions** across rounds for
+  Agent/CCR/FedA3I: explains behavioural differences. Read from
+  `agent_weight_history` / `agent_probe_history` in the run JSONs.
+- **Fig. 9 — Per-label macro-F1 / class-wise AP boxplot**: checks whether rare
+  labels drive the F1 collapse. Needs raw predictions.
+
+These are wired to `make_agent_figures.py`; run on the GPU checkout where
+`runs/paper_matrix/{agent_supp,agent_odir,agent_scale}/` exist.
