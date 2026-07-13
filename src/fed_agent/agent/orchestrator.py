@@ -237,6 +237,68 @@ def decide_weights_feda3i(
     return AgentDecision(weights=raw, probe_component=quality, geometry_component=[1.0] * n)
 
 
+def decide_weights_fednoro(
+    *,
+    per_client_mean_loss: list[float],
+    sizes: list[float],
+) -> AgentDecision:
+    """FedNoRo-style distance-aware aggregation (Wu et al., IJCAI 2023).
+
+    Reproduces FedNoRo's noisy-client identification: fit a two-component GMM over
+    the **client-level** average training losses and treat the low-mean cluster as
+    clean. Each client's clean responsibility (posterior of the clean component)
+    scales its aggregation weight (distance-aware): ``w_i ∝ size_i * clean_resp_i``.
+
+    Unlike FedA3I (per-sample loss GMM, weighting only), FedNoRo pairs this with a
+    two-stage schedule (FedAvg warmup, then a noise-robust loss on the identified
+    noisy clients); that schedule is handled in the runner. The returned
+    ``probe_component`` carries per-client clean responsibility so the caller can
+    route noisy clients (clean_resp < 0.5) to the robust loss.
+    """
+    n = len(per_client_mean_loss)
+    if n == 0:
+        return AgentDecision([], [], [])
+    if len(sizes) != n:
+        raise ValueError("sizes length must match per_client_mean_loss")
+    x = np.asarray(per_client_mean_loss, dtype=float)
+    fit = _fit_2comp_gmm_1d(x)
+    clean_resp = [1.0] * n
+    if fit is not None:
+        pi, mu, var = fit
+        sep = abs(float(mu[1] - mu[0]))
+        pooled_sd = math.sqrt(max(float(var.max()), 1e-12))
+        # Require the split to be both statistically separated AND a meaningful
+        # fraction of the loss magnitude; the latter guards against GMM overfitting
+        # a near-identical (unimodal) set of a few client-level losses into two
+        # spurious tiny-variance clusters.
+        min_gap = max(2.0 * pooled_sd, 0.3 * abs(float(mu.max())))
+        if sep >= min_gap:  # well-separated, meaningful clean/noisy split
+            clean = int(np.argmin(mu))
+            noisy = 1 - clean
+            resp: list[float] = []
+            for v in x:
+                pc = (
+                    pi[clean]
+                    * np.exp(-0.5 * (v - mu[clean]) ** 2 / var[clean])
+                    / np.sqrt(2.0 * np.pi * var[clean])
+                )
+                pn = (
+                    pi[noisy]
+                    * np.exp(-0.5 * (v - mu[noisy]) ** 2 / var[noisy])
+                    / np.sqrt(2.0 * np.pi * var[noisy])
+                )
+                resp.append(float(pc / (pc + pn + 1e-12)))
+            clean_resp = resp
+    raw = [sizes[i] * clean_resp[i] for i in range(n)]
+    z = sum(raw)
+    if z <= 0:
+        zs = sum(sizes) or 1.0
+        raw = [s / zs for s in sizes]
+    else:
+        raw = [r / z for r in raw]
+    return AgentDecision(weights=raw, probe_component=clean_resp, geometry_component=[1.0] * n)
+
+
 def decide_weights(
     *,
     probe_scores: list[float],

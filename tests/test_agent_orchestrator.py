@@ -9,7 +9,36 @@ from fed_agent.agent.orchestrator import (
     decide_weights,
     decide_weights_ccr,
     decide_weights_feda3i,
+    decide_weights_fednoro,
 )
+
+
+def test_fednoro_downweights_high_loss_clients():
+    # Two clean clients (low mean loss) and two noisy (high mean loss).
+    d = decide_weights_fednoro(
+        per_client_mean_loss=[0.10, 0.12, 0.95, 1.05],
+        sizes=[100, 100, 100, 100],
+    )
+    assert abs(sum(d.weights) - 1.0) < 1e-9
+    clean_mass = d.weights[0] + d.weights[1]
+    noisy_mass = d.weights[2] + d.weights[3]
+    assert clean_mass > noisy_mass
+    # clean clients should carry near-1 posterior, noisy near-0
+    assert d.probe_component[0] > 0.5 and d.probe_component[3] < 0.5
+
+
+def test_fednoro_unimodal_stays_uniform():
+    # No separable noisy cluster -> everyone treated clean -> size-proportional.
+    d = decide_weights_fednoro(
+        per_client_mean_loss=[0.30, 0.31, 0.29, 0.30],
+        sizes=[100, 100, 100, 100],
+    )
+    assert all(abs(w - 0.25) < 1e-6 for w in d.weights)
+
+
+def test_fednoro_empty():
+    d = decide_weights_fednoro(per_client_mean_loss=[], sizes=[])
+    assert d.weights == []
 
 
 def test_equal_scores_reduce_to_size_weights():

@@ -55,3 +55,5 @@ runs:
   - { name: het04_trimmed_s0, agent_aggregation: trimmed, agent_trim_ratio: 0.25, seed: 0 }
   # Asymmetric (class-conditional) label noise smoke
   - { name: het04asym_agent_s0, agent_aggregation: agent, agent_noise_mode: asymmetric, seed: 0 }
+  # FedNoRo baseline (warmup + client-loss GMM + GCE robust loss on noisy clients)
+  - { name: het04_fednoro_s0, agent_aggregation: fednoro, agent_fednoro_warmup: 2, seed: 0 }

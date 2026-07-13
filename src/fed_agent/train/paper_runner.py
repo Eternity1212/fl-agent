@@ -52,7 +52,10 @@ class PaperRunConfig:
     # --- agent (adaptive orchestration) options ---
     # "agent" | "size" (FedAvg) | "ccr" (RHFL) | "feda3i" (FedA3I quality-aware)
     #   | "median" (coord-median) | "trimmed" (trimmed-mean) — Byzantine-robust
+    #   | "fednoro" (FedNoRo: warmup + client-loss GMM + robust loss on noisy)
     agent_aggregation: str = "agent"
+    agent_fednoro_warmup: int = 5  # FedAvg warmup rounds before noisy-client GMM
+    agent_fednoro_gce_q: float = 0.7  # GCE robustness q for identified-noisy clients
     agent_tau: float = 0.05
     agent_ccr_temp: float = 0.05  # softmax temperature for the CCR baseline
     agent_trim_ratio: float = 0.25  # fraction trimmed each side for "trimmed"
@@ -173,6 +176,28 @@ def _apply_asymmetric_flip(
     return out
 
 
+def _gce_multilabel_loss(
+    logits: torch.Tensor,
+    y: torch.Tensor,
+    *,
+    q: float,
+    pos_weight: torch.Tensor | None,
+) -> torch.Tensor:
+    """Generalized Cross Entropy (Zhang & Sabuncu, 2018) for multi-label BCE.
+
+    Robust to label noise: L = (1 - p_t^q) / q, where p_t is the model's
+    probability of the (possibly noisy) target. q->0 recovers CE, q->1 recovers
+    MAE. Used by FedNoRo for the clients identified as noisy.
+    """
+    p = torch.sigmoid(logits)
+    pt = torch.where(y > 0.5, p, 1.0 - p).clamp_min(1e-6)
+    loss = (1.0 - pt ** float(q)) / float(q)
+    if pos_weight is not None:
+        w = torch.where(y > 0.5, pos_weight, torch.ones_like(pos_weight))
+        loss = loss * w
+    return loss.mean()
+
+
 def _loss_fn(cfg: PaperRunConfig, pos_weight: torch.Tensor | None) -> nn.Module:
     if cfg.loss == "balanced_bce":
         return nn.BCEWithLogitsLoss(pos_weight=pos_weight)
@@ -229,6 +254,7 @@ def _train_model(
     round_seed: int = 0,
     label_flip_p: float = 0.0,
     mu_override: float | None = None,
+    robust_loss: bool = False,
 ) -> float:
     device = _device_for(cfg)
     model.to(device)
@@ -255,7 +281,12 @@ def _train_model(
             y = _apply_positive_dropout(y, p=float(cfg.positive_dropout), seed=int(round_seed))
             opt.zero_grad()
             logits = model(x)
-            loss = loss_fn(logits, y)
+            if robust_loss:
+                loss = _gce_multilabel_loss(
+                    logits, y, q=float(cfg.agent_fednoro_gce_q), pos_weight=pw
+                )
+            else:
+                loss = loss_fn(logits, y)
             if mu > 0.0 and global_vec is not None:
                 cur = torch.nn.utils.parameters_to_vector(list(model.parameters()))
                 loss = loss + 0.5 * mu * (cur - global_vec).pow(2).sum()
@@ -442,6 +473,7 @@ def _run_agent_federated(
         decide_weights,
         decide_weights_ccr,
         decide_weights_feda3i,
+        decide_weights_fednoro,
     )
 
     split = read_split_json(split_json)
@@ -455,12 +487,14 @@ def _run_agent_federated(
         cfg.agent_aggregation in ("agent", "ccr") or bool(cfg.agent_adaptive_mu)
     )
     need_feda3i = cfg.agent_aggregation == "feda3i"
+    need_fednoro = cfg.agent_aggregation == "fednoro"
     round_losses: list[float] = []
     upload_bytes: list[int] = []
     weight_history: list[dict[str, float]] = []
     probe_history: list[dict[str, float]] = []
     mu_history: list[dict[str, float]] = []
     prev_scores: dict[str, float] = {}
+    prev_clean_resp: dict[str, float] = {}  # FedNoRo: last round's clean posterior
     for r in range(int(cfg.rounds)):
         local_sds = []
         sizes: list[float] = []
@@ -483,6 +517,11 @@ def _run_agent_federated(
                 tau=float(cfg.agent_mu_tau),
             )
             cur_mu = {k: m for k, m in zip(ordered, mus)}
+        # FedNoRo stage-2 routing: after warmup, clients whose previous-round clean
+        # posterior < 0.5 are treated as noisy and trained with the robust GCE loss.
+        fednoro_noisy: set[str] = set()
+        if need_fednoro and r >= int(cfg.agent_fednoro_warmup) and prev_clean_resp:
+            fednoro_noisy = {k for k, v in prev_clean_resp.items() if v < 0.5}
         for ck in client_keys:
             idxs = train_ds.indices_for_ids(list(clients[ck]))
             if not idxs:
@@ -503,6 +542,7 @@ def _run_agent_federated(
                 round_seed=int(cfg.seed) + r * 1000 + int(ck),
                 label_flip_p=flip,
                 mu_override=mu_i if cfg.agent_adaptive_mu else None,
+                robust_loss=(ck in fednoro_noisy),
             )
             local_sds.append(_state_dict_cpu(model))
             sizes.append(float(len(idxs)))
@@ -571,6 +611,21 @@ def _run_agent_federated(
                     sizes=sizes,
                 )
                 weights = decision.weights
+            elif cfg.agent_aggregation == "fednoro":
+                if r < int(cfg.agent_fednoro_warmup):
+                    # Stage 1: plain FedAvg warmup (size weights).
+                    weights = list(sizes)
+                    prev_clean_resp = {ck: 1.0 for ck in cks}
+                else:
+                    # Stage 2: distance-aware weights from client-level loss GMM.
+                    decision = decide_weights_fednoro(
+                        per_client_mean_loss=losses,
+                        sizes=sizes,
+                    )
+                    weights = decision.weights
+                    prev_clean_resp = {
+                        ck: float(s) for ck, s in zip(cks, decision.probe_component)
+                    }
             else:
                 weights = list(sizes)
 
