@@ -1,41 +1,49 @@
-# When Does Robust Federated Aggregation Actually Help?
+# Failure Boundaries of Robust and Quality-Aware Aggregation in Multi-Label Federated Ophthalmic Learning
 
-**An Empirical Study of Reweighting, Byzantine-Robust, and Quality-Aware
-Aggregation for Multi-Label Retinal Diagnosis under Label Noise**
+*(alt. title: "When Robust Aggregation Fails: An Empirical Study of
+RETFound–LoRA Multi-Label Federated Ophthalmic Learning under Label Noise")*
 
-> 完整初稿(DeCaF / MIDL 级),基于**已落盘的 3-seed 结果**写成,正文所有数字均为实测,
-> 无占位符。FedNoRo 与非对称噪声为**已就绪但尚在跑**的扩展,列入 §7 Ongoing Extensions,
-> 不阻塞本稿结论。英文正文 + 中文旁注(投稿时删旁注)。
+> **Central thesis (one-line message):** *Robust aggregation in medical
+> multi-label FL is governed by **failure boundaries**, not by a universal
+> winner — its usefulness is conditional on dataset, corruption fraction,
+> heterogeneity, scale, and the metric one reads.*
 >
+> 完整初稿(**MIDL-oral 定位改写版**),基于已落盘 3-seed 结果,正文数字均为实测,无占位符。
+> MIDL 2025 scope 命中:*foundation models · federated learning · learning with noisy labels ·
+> validation studies · safe/trustworthy learning · ophthalmology*。FedNoRo 与非对称噪声为
+> **已实现在跑**的扩展(§7)。英文正文 + 中文旁注(投稿删旁注)。
 > 数据来源:RFMiD supp / ODIR / scale 三份 3-seed CSV + `agent_stage1`(het04 50% 锚点)。
 
 ---
 
 ## Abstract
 
-Federated learning (FL) for multi-label fundus diagnosis must cope with
-heterogeneous clients whose labels are noisy, and a growing set of "robust"
-aggregators promise resilience to such corruption. We ask a deliberately simple
-question: *under which conditions do these methods actually help, and where do
-they break?* Using a foundation-model backbone (RETFound) with LoRA
-parameter-efficient fine-tuning on two public datasets (RFMiD and ODIR-5K), we
-benchmark four aggregation families — vanilla/proximal averaging (FedAvg,
-FedProx), Byzantine-robust aggregation (coordinate-median, trimmed-mean),
-quality-aware aggregation (FedA3I), and probe/confidence reweighting (CCR/RHFL
-and an adaptive probe-gated variant) — across corruption fractions (25–50% noisy
-clients), non-IID (Dirichlet) partitions, and client scales (K=4, K=8). Ranking
-by threshold-free macro-AUROC (with F1 reported as a secondary usability metric),
-we report three findings that are individually publishable and jointly caution
-the robust-FL literature: (i) the competitiveness of quality-aware aggregation
-**inverts across datasets** — FedA3I is bottom-tier on RFMiD yet top-ranked on
-ODIR; (ii) coordinate-median fails along a **two-dimensional boundary** —
-it recovers when the corrupted fraction drops within its `n≥2f+1` tolerance under
-IID splits, but remains unreliable under non-IID splits even at 25% corruption,
-identifying client heterogeneity as a second, independent stressor; and (iii)
-macro-AUROC and F1 rankings **frequently disagree**, so single-metric claims of
-aggregator superiority are unsafe. Reference-based probe/confidence reweighting
-degrades most gracefully across corruption and scale. We release the full
-seed-matched benchmark and a one-command reproduction pipeline.
+**Problem.** Federated learning (FL) for multi-label fundus diagnosis must cope
+with heterogeneous clients whose labels are noisy — precisely the setting where a
+growing set of "robust" aggregators promise resilience.
+**Gap.** Yet these methods are almost always validated on natural-image
+single-label benchmarks with synthetic IID corruption and a single dataset/metric;
+whether they transfer to foundation-model, multi-label, multi-centre ophthalmic FL
+is untested.
+**Approach.** Using RETFound with LoRA on two public retinal datasets (RFMiD,
+ODIR-5K), we run a controlled, seed-matched benchmark of four aggregation families
+— vanilla/proximal averaging (FedAvg, FedProx), Byzantine-robust (coordinate-median,
+trimmed-mean), quality-aware (FedA3I; FedNoRo), and probe/confidence reweighting
+(CCR/RHFL and an adaptive probe-gated variant) — sweeping corruption fraction
+(25–50% noisy clients), non-IID (Dirichlet) heterogeneity, and client scale
+(K=4, K=8), ranking by threshold-free macro-AUROC with F1 as a usability metric.
+**Findings.** No aggregator wins universally; instead each is bounded by a *failure
+boundary*: (i) quality-aware aggregation **inverts rank across datasets** (FedA3I
+is bottom-tier on RFMiD, top-ranked on ODIR); (ii) coordinate-median fails along a
+**two-dimensional boundary** — it recovers within its `n≥2f+1` tolerance under IID
+splits but stays unreliable under non-IID splits even at 25% corruption, exposing
+heterogeneity as a second, independent stressor; and (iii) macro-AUROC and F1
+rankings **frequently disagree**, so single-metric superiority claims are unsafe.
+Reference-based reweighting degrades most gracefully across corruption and scale.
+**Recommendation.** Robust-FL for medical imaging should be evaluated by
+stress-testing heterogeneity × corruption and reporting AUROC *and* F1, rather than
+by average-case single-benchmark rankings. We release the benchmark and a
+one-command reproduction pipeline.
 
 ---
 
@@ -184,7 +192,10 @@ metric dissociation of §4.5.
 > 图见文末 §9。核心图:Fig.2 失败边界热图、Fig.3 AUROC–F1 分裂散点、Fig.4 跨数据集排名翻转、
 > Fig.5 K 稀释-恢复、Fig.6 结论矩阵。
 
-### 4.1 The competitiveness of quality-aware aggregation is dataset-dependent
+### 4.1 RQ1 — Does the best aggregator transfer across datasets?
+
+**Answer: No.** The competitiveness of quality-aware aggregation is
+dataset-dependent, and rank order inverts between the two datasets (Fig. 4).
 
 On **RFMiD het02** (p=0.2, 2/4 noisy), probe/confidence reweighting leads and
 FedA3I trails FedAvg:
@@ -217,7 +228,10 @@ baseline is a key empirical result and cautions against single-dataset aggregato
 claims. Note also that FedA3I's ODIR AUROC lead does *not* translate to F1 (0.463
 vs Agent/CCR ≈0.58) — a first instance of the metric split we return to in §4.5.
 
-### 4.2 Byzantine-robust aggregation fails along a two-dimensional boundary
+### 4.2 RQ2 — Is Byzantine-robust aggregation a safe default under label noise?
+
+**Answer: No — it fails along a two-dimensional boundary** set jointly by
+corruption fraction and client heterogeneity (Fig. 2).
 
 Coordinate-median / trimmed-mean tolerate `<50%` corrupted clients (`n≥2f+1`).
 We sweep corruption fraction under IID and non-IID splits (RFMiD, K=4). FedAvg and
@@ -250,7 +264,10 @@ multi-centre medical FL routinely fall outside median's viable regime, robust
 statistics can be an actively harmful default here; adaptive reweighting degrades
 gracefully instead.
 
-### 4.3 Non-IID dilution is a metric-dimension dissociation, not a clean recovery
+### 4.3 RQ3 — Under severe non-IID + noise, does reweighting "recover" performance?
+
+**Answer: Only on F1, and unstably** — the non-IID effect is a *metric-dimension
+dissociation*, not a clean AUROC recovery (Fig. 3).
 
 On **RFMiD het04_dir** (non-IID, 50% noisy), 3-seed:
 
@@ -290,7 +307,9 @@ recovery is milder with smaller variance:
 So the catastrophic F1 collapse under non-IID is **RFMiD-specific**, not
 universal — yet another cross-dataset caveat.
 
-### 4.4 The dilution-vs-recovery pattern persists at K=8
+### 4.4 RQ4 — Does the dilution-vs-recovery pattern hold at larger scale?
+
+**Answer: Yes at K=8 IID (decisively), trend-consistent at K=8 non-IID** (Fig. 5).
 
 K=8 (4/8 noisy, 50% fraction), 3-seed, macro-AUROC:
 
@@ -311,10 +330,11 @@ variance), so we report it as trend-consistent rather than a clear recovery.
 FedA3I is ≈FedAvg on AUROC with collapsed F1 (no recovery); median collapses.
 Agent and CCR form a **co-leading pair** — we do not claim the agent dominates.
 
-### 4.5 Metric-dimension dissociation (AUROC vs F1) is itself a finding
+### 4.5 RQ5 — Is a single metric sufficient to rank robust aggregators?
 
-Across conditions, macro-AUROC (ranking) and best-micro-F1 (usable prediction)
-disagree:
+**Answer: No.** macro-AUROC (ranking) and best-micro-F1 (usable prediction)
+frequently disagree, so single-metric reporting yields contradictory rankings
+(Fig. 3).
 - FedAvg @ RFMiD het04_dir: AUROC 0.65 (ok) vs F1 0.076 (collapsed).
 - FedA3I @ ODIR het04: **top AUROC 0.801** vs F1 0.463 (< Agent/CCR 0.58).
 - FedA3I / trimmed @ K=8: AUROC partial vs F1 collapsed.
@@ -344,6 +364,21 @@ over-concentrates (unlike CCR's reference-free softmax under heterogeneity) nor
 discards heterogeneous-but-honest updates (unlike median). It still inherits the
 F1 instability under extreme non-IID (§4.3).
 
+**Recommendations for the community (the paper's main takeaway).** We argue the
+field should change *how it evaluates* robust FL for medical imaging:
+1. **Stress-test the two-dimensional regime**, not the average case: report
+   performance across a corruption-fraction × heterogeneity grid (Fig. 2), since
+   a method that is "robust" at one operating point can be catastrophic one cell
+   away.
+2. **Report AUROC and F1 together**: ranking ability and thresholded usability
+   dissociate (Fig. 3); a single metric can invert the conclusion.
+3. **Validate on ≥2 datasets**: single-benchmark rankings are unreliable — the
+   *same* quality-aware method flips from worst to best across RFMiD and ODIR
+   (Fig. 4).
+4. **Prefer graceful-degradation designs**: reference-based reweighting that
+   reduces to FedAvg when clients agree avoids the catastrophic failures of hard
+   robust statistics without sacrificing the clean case.
+
 **Implications.** (1) Robust-FL claims should be validated across ≥2 datasets and
 reported on ≥2 metrics. (2) Byzantine-robust statistics are unsafe defaults for
 multi-centre medical FL where corruption fraction and heterogeneity are both
@@ -360,12 +395,16 @@ contribution in itself.
 
 ## 6. Conclusion
 
-Across two datasets, two scales, and four aggregation families, "robustness" in
-federated multi-label retinal diagnosis is highly conditional: quality-aware
-aggregation inverts rank across datasets, Byzantine-robust aggregation fails along
-a two-dimensional (corruption × heterogeneity) boundary, and AUROC/F1 rankings
-disagree. Reference-based reweighting degrades most gracefully. We release the
-benchmark to encourage multi-dataset, dual-metric evaluation of robust FL.
+**Robust aggregation in medical multi-label FL is governed by failure boundaries,
+not by a universal winner.** Across two datasets, two scales, and four aggregation
+families, "robustness" is highly conditional: quality-aware aggregation inverts
+rank across datasets, Byzantine-robust aggregation fails along a two-dimensional
+(corruption × heterogeneity) boundary, and AUROC/F1 rankings disagree.
+Reference-based reweighting degrades most gracefully but is not universally best.
+The actionable message is for *evaluation practice*: stress-test the
+heterogeneity × corruption regime and report AUROC and F1 together, rather than
+trust average-case single-benchmark rankings. We release the benchmark and
+pipeline to make such evaluation the default.
 
 ---
 
@@ -391,11 +430,38 @@ Both are wired into `run_noise.sh`; results slot into Tables 1/3 and a new §4.6
 (median/trimmed + K=8), `run_odir.sh` (ODIR); each does data download → split →
 matrix → summary/figures with per-run checkpointing. All configs/seeds released.
 
-**Target venues.** Primary: **MICCAI DeCaF workshop** and **MIDL** (rigorous
-empirical medical-FL studies welcome; the failure-boundary and cross-dataset
-inversion are strong workshop/short-paper findings). Stretch: **MICCAI main
-conference**, feasible with the §7 extensions plus a third dataset or K=16.
-Journal fallback: *Medical Image Analysis* / *IEEE JBHI* FL special issues.
+**Target venue — MIDL (primary).** MIDL 2025's CfP explicitly welcomes
+"well-validated applications" and "validation studies" alongside methodological
+work, and its topic list names *foundation models*, *federated learning*,
+*learning with noisy labels*, *safe and trustworthy learning*, *validation
+studies*, and *ophthalmology* — this paper hits each. We therefore target MIDL as
+a **full paper**, positioned as an evaluation-driven, clinically grounded
+empirical study (not a new-method paper).
+
+MIDL scope mapping (逐项命中,写进 cover letter):
+
+| MIDL topic | This paper |
+|---|---|
+| foundation models for medical imaging | RETFound backbone |
+| federated learning for medical imaging | 4 aggregation families, K=4/8 |
+| learning with noisy labels | 25–50% client label noise, sym+asym |
+| safe & trustworthy learning | failure-boundary characterization |
+| validation studies | seed-matched, dual-metric, 2 datasets |
+| ophthalmology | RFMiD + ODIR-5K fundus |
+
+Realistic outcome: **accept as full paper is competitive**; **oral/spotlight** is
+reachable if the single-thesis framing + main figures (Figs. 2–4) land, plus the
+§7 extensions (FedNoRo, asymmetric noise). Fallback: **MICCAI DeCaF workshop**;
+stretch beyond MIDL: MICCAI main (needs a 3rd dataset or K=16). Journal fallback:
+*Medical Image Analysis* / *IEEE JBHI* FL special issues.
+
+**What would push this to oral/spotlight (honest gap list):**
+1. FedNoRo + asymmetric-noise results folded in (removes "incomplete noisy-label
+   coverage" critique) — *running*.
+2. Fig. 1 study-overview schematic + Fig. 8 client-weight-distribution
+   (explains *what the agent estimates*) — *GPU-side, §9.2*.
+3. Tighten every RQ subsection to a one-sentence answer (done, §4) and keep
+   Discussion abstract/rule-level rather than result-restating (done, §5).
 
 **Figures to render** (via `make_agent_figures`): breakdown-point curve (§4.2),
 cross-dataset bar chart (§4.1), non-IID collapse/recovery (§4.3), K=8 scaling
